@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc \"C:\\\\Users\\\\Nanta\\\\Downloads\\\\Requirement_ระบบตัดสต๊อกโดนัท_Final.docx\" -o - --to markdown)",
+      "PowerShell(Expand-Archive -Path \"C:\\\\Users\\\\Nanta\\\\Downloads\\\\Requirement_ระบบตัดสต๊อกโดนัท_Final.docx\" -DestinationPath \"$env:TEMP\\\\donut_docx\" -Force; Get-ChildItem \"$env:TEMP\\\\donut_docx\\\\word\")",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --yes)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(Get-Command node)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); node --version; npm --version)"
+    ]
+  }
+}

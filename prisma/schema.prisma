@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderChannel {
+  WALK_IN
+  FACEBOOK
+  LINE
+  PHONE
+  OTHER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  name      String
+  role      Role     @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id         String       @id @default(cuid())
+  name       String
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  dailyStock DailyStock[]
+  orderItems OrderItem[]
+}
+
+model DailyStock {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  produced  Int      @default(0)
+  reserved  Int      @default(0)
+  walkIn    Int      @default(0)
+
+  @@unique([date, productId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model TimeSlot {
+  id         String   @id @default(cuid())
+  label      String
+  startTime  String
+  endTime    String
+  maxOrders  Int      @default(0)
+  isActive   Boolean  @default(true)
+  orders     Order[]
+}
+
+model Order {
+  id         String       @id @default(cuid())
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  customerId String
+  timeSlot   TimeSlot?    @relation(fields: [timeSlotId], references: [id])
+  timeSlotId String?
+  pickupDate DateTime?    @db.Date
+  channel    OrderChannel @default(WALK_IN)
+  status     OrderStatus  @default(PENDING)
+  note       String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  items      OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+}
