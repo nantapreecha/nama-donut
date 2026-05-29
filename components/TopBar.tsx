@@ -1,4 +1,6 @@
-import Link from "next/link";
+"use client";
+
+import { signOut } from "next-auth/react";
 
 interface Props {
   name: string;
@@ -17,12 +19,12 @@ export default function TopBar({ name, role }: Props) {
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${role === "ADMIN" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"}`}>
           {role === "ADMIN" ? "Admin" : "Staff"}
         </span>
-        <Link
-          href="/logout"
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
           className="text-sm text-white bg-red-400 hover:bg-red-500 transition-colors px-3 py-1 rounded-lg font-medium"
         >
           ออกจากระบบ
-        </Link>
+        </button>
       </div>
     </header>
   );
