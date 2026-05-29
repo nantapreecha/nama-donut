@@ -9,7 +9,8 @@
       "PowerShell(Get-Command node)",
       "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); node --version; npm --version)",
       "PowerShell(pandoc \"C:\\\\Users\\\\Nanta\\\\Downloads\\\\Requirement_ระบบตัดสต๊อกโดนัท_Final.docx\" -o \"$env:TEMP\\\\req.md\" --to markdown; Get-Content \"$env:TEMP\\\\req.md\" -Encoding utf8)",
-      "PowerShell(pandoc \"C:\\\\Users\\\\Nanta\\\\Downloads\\\\Requirement_?????????????????_Final.docx\" -t markdown 2>&1)"
+      "PowerShell(pandoc \"C:\\\\Users\\\\Nanta\\\\Downloads\\\\Requirement_?????????????????_Final.docx\" -t markdown 2>&1)",
+      "PowerShell(cd \"C:\\\\Users\\\\Nanta\\\\OneDrive\\\\Documents\\\\Cowork\\\\Nama\"; git add app/api/products/[id]/route.ts app/\\(app\\)/admin/page.tsx; git commit -m \"feat: add delete product in admin page\"; git push)"
     ]
   }
 }

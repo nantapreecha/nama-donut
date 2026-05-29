@@ -69,6 +69,13 @@ export default function AdminPage() {
     loadData();
   }
 
+  async function deleteProduct(id: string, name: string) {
+    if (!confirm(`ลบ "${name}" ออกจากระบบ?`)) return;
+    await fetch(`/api/products/${id}`, { method: "DELETE" });
+    showMsg("ลบสินค้าเรียบร้อย");
+    loadData();
+  }
+
   async function addSlot(e: React.FormEvent) {
     e.preventDefault();
     setAddingSlot(true);
@@ -157,12 +164,20 @@ export default function AdminPage() {
                 <p className={`flex-1 font-medium ${p.isActive ? "text-gray-800" : "text-gray-400 line-through"}`}>
                   {p.name}
                 </p>
-                <button
-                  onClick={() => toggleProduct(p.id, p.isActive)}
-                  className={`text-sm px-3 py-1.5 rounded-xl font-medium ${p.isActive ? "bg-gray-100 text-gray-600" : "bg-orange-100 text-orange-600"}`}
-                >
-                  {p.isActive ? "ปิด" : "เปิด"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleProduct(p.id, p.isActive)}
+                    className={`text-sm px-3 py-1.5 rounded-xl font-medium ${p.isActive ? "bg-gray-100 text-gray-600" : "bg-orange-100 text-orange-600"}`}
+                  >
+                    {p.isActive ? "ปิด" : "เปิด"}
+                  </button>
+                  <button
+                    onClick={() => deleteProduct(p.id, p.name)}
+                    className="text-sm px-3 py-1.5 rounded-xl font-medium bg-red-50 text-red-500"
+                  >
+                    ลบ
+                  </button>
+                </div>
               </div>
             ))}
           </div>
