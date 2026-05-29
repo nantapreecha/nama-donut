@@ -237,7 +237,7 @@ export default function OrdersPage() {
                     )}
                   </div>
                   <div className="text-sm text-gray-700">
-                    {order.items.map((i) => `${i.product.name} ×${i.quantity}`).join(", ")}
+                    {order.items.map((i) => `${i.product.name} ×${i.quantity} ชิ้น`).join(", ")}
                   </div>
                   {order.note && <p className="text-xs text-gray-400">{order.note}</p>}
                   {order.status === "PENDING" && (
@@ -403,7 +403,7 @@ export default function OrdersPage() {
                 <div className="flex-1">
                   <p className="font-medium text-gray-800">{item.name}</p>
                   <p className={`text-xs ${item.available <= 0 ? "text-red-500" : item.available <= 5 ? "text-yellow-600" : "text-gray-400"}`}>
-                    เหลือ {item.available}
+                    เหลือ {item.available} ชิ้น
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -414,7 +414,7 @@ export default function OrdersPage() {
                   >
                     −
                   </button>
-                  <span className="w-6 text-center font-semibold">{items[item.productId] ?? 0}</span>
+                  <span className="font-semibold">{items[item.productId] ?? 0} <span className="text-xs font-normal text-gray-400">ชิ้น</span></span>
                   <button
                     type="button"
                     onClick={() => setItem(item.productId, (items[item.productId] ?? 0) + 1)}

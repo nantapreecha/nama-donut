@@ -134,10 +134,10 @@ export default function StockPage() {
                   </button>
                 </div>
                 <div className="flex gap-3 mt-2 text-xs text-gray-400">
-                  <span>จอง {item.reserved}</span>
-                  <span>หน้าร้าน {item.walkIn}</span>
+                  <span>จอง {item.reserved} ชิ้น</span>
+                  <span>หน้าร้าน {item.walkIn} ชิ้น</span>
                   <span className={`font-medium ${item.available <= 0 ? "text-red-500" : item.available <= 5 ? "text-yellow-600" : "text-green-600"}`}>
-                    เหลือ {item.available}
+                    เหลือ {item.available} ชิ้น
                   </span>
                 </div>
               </div>

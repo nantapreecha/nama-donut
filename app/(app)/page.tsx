@@ -157,7 +157,7 @@ export default function DashboardPage() {
                   <div className="flex-1">
                     <p className="font-medium text-gray-800">{item.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      ผลิต {item.produced} · จอง {item.reserved} · หน้าร้าน {item.walkIn}
+                      ผลิต {item.produced} ชิ้น · จอง {item.reserved} ชิ้น · หน้าร้าน {item.walkIn} ชิ้น
                     </p>
                   </div>
                   <div className="text-right">

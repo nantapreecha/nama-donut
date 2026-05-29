@@ -127,7 +127,7 @@ export default function POSPage() {
                 <p className={`text-sm mt-1 ${
                   sold ? "text-red-500" : item.available <= 5 ? "text-yellow-600" : "text-green-600"
                 }`}>
-                  {sold ? "หมด" : item.available <= 5 ? `เหลือ ${item.available}` : `เหลือ ${item.available}`}
+                  {sold ? "หมด" : `เหลือ ${item.available} ชิ้น`}
                 </p>
                 {qty > 0 && (
                   <div className="absolute top-2 right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
@@ -158,7 +158,7 @@ export default function POSPage() {
                   >
                     −
                   </button>
-                  <span className="w-6 text-center font-semibold">{item.quantity}</span>
+                  <span className="font-semibold">{item.quantity} <span className="text-xs font-normal text-gray-400">ชิ้น</span></span>
                   <button
                     onClick={() => {
                       const s = stock.find((s) => s.productId === item.productId);
