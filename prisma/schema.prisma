@@ -26,6 +26,16 @@ enum OrderChannel {
   OTHER
 }
 
+enum OrderType {
+  WALKIN
+  RESERVE
+}
+
+enum DoughType {
+  PUMPKIN
+  MOCHI
+}
+
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
@@ -67,12 +77,13 @@ model Customer {
 }
 
 model TimeSlot {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   label      String
   startTime  String
   endTime    String
-  maxOrders  Int      @default(0)
-  isActive   Boolean  @default(true)
+  maxOrders  Int       @default(0)
+  isActive   Boolean   @default(true)
+  orderType  OrderType @default(WALKIN)
   orders     Order[]
 }
 
@@ -84,6 +95,8 @@ model Order {
   timeSlotId String?
   pickupDate DateTime?    @db.Date
   channel    OrderChannel @default(WALK_IN)
+  orderType  OrderType    @default(WALKIN)
+  doughType  DoughType    @default(PUMPKIN)
   status     OrderStatus  @default(PENDING)
   note       String?
   createdAt  DateTime     @default(now())

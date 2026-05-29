@@ -7,13 +7,17 @@ export async function GET() {
   const nextDay = new Date(today);
   nextDay.setDate(nextDay.getDate() + 1);
 
-  const [stocks, pendingOrders, products] = await Promise.all([
+  const [stocks, pendingOrders, products, allOrders] = await Promise.all([
     prisma.dailyStock.findMany({ where: { date: today }, include: { product: true } }),
     prisma.order.findMany({
       where: { pickupDate: { gte: today, lt: nextDay }, status: "PENDING" },
       include: { customer: true, timeSlot: true, items: { include: { product: true } } },
     }),
     prisma.product.findMany({ where: { isActive: true } }),
+    prisma.order.findMany({
+      where: { pickupDate: { gte: today, lt: nextDay }, status: { not: "CANCELLED" } },
+      include: { timeSlot: true, items: true },
+    }),
   ]);
 
   const stockMap = new Map(stocks.map((s) => [s.productId, s]));
@@ -32,6 +36,39 @@ export async function GET() {
   const lowStock = stockSummary.filter((s) => s.available > 0 && s.available <= 5);
   const outOfStock = stockSummary.filter((s) => s.produced > 0 && s.available === 0);
 
+  // Summary grouped by orderType + timeSlot + doughType
+  type SummaryKey = string;
+  const summaryMap = new Map<SummaryKey, {
+    orderType: string;
+    slotLabel: string;
+    slotTime: string;
+    doughType: string;
+    quantity: number;
+  }>();
+
+  for (const order of allOrders) {
+    const slotLabel = order.timeSlot?.label ?? "ไม่ระบุรอบ";
+    const slotTime = order.timeSlot?.startTime ?? "";
+    const key = `${order.orderType}|${slotLabel}|${slotTime}|${order.doughType}`;
+    const qty = order.items.reduce((s, i) => s + i.quantity, 0);
+    if (summaryMap.has(key)) {
+      summaryMap.get(key)!.quantity += qty;
+    } else {
+      summaryMap.set(key, {
+        orderType: order.orderType,
+        slotLabel,
+        slotTime,
+        doughType: order.doughType,
+        quantity: qty,
+      });
+    }
+  }
+
+  const orderSummary = Array.from(summaryMap.values()).sort((a, b) => {
+    if (a.orderType !== b.orderType) return a.orderType.localeCompare(b.orderType);
+    return a.slotTime.localeCompare(b.slotTime);
+  });
+
   return NextResponse.json({
     totalSold,
     pendingOrdersCount: pendingOrders.length,
@@ -39,5 +76,6 @@ export async function GET() {
     pendingOrders,
     lowStock,
     outOfStock,
+    orderSummary,
   });
 }

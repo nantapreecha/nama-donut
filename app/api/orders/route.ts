@@ -29,7 +29,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { customerId, timeSlotId, pickupDate, channel, note, items } = await req.json();
+  const { customerId, timeSlotId, pickupDate, channel, orderType, doughType, note, items } = await req.json();
 
   const today = startOfDay(new Date());
   const pickup = pickupDate ? new Date(pickupDate) : today;
@@ -72,6 +72,8 @@ export async function POST(req: Request) {
         timeSlotId,
         pickupDate: pickup,
         channel,
+        orderType: orderType ?? "WALKIN",
+        doughType: doughType ?? "PUMPKIN",
         note,
         items: { create: items.map((i: any) => ({ productId: i.productId, quantity: i.quantity })) },
       },

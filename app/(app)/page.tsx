@@ -12,12 +12,21 @@ interface StockItem {
   available: number;
 }
 
+interface OrderSummary {
+  orderType: string;
+  slotLabel: string;
+  slotTime: string;
+  doughType: string;
+  quantity: number;
+}
+
 interface DashboardData {
   totalSold: number;
   pendingOrdersCount: number;
   stockSummary: StockItem[];
   lowStock: StockItem[];
   outOfStock: StockItem[];
+  orderSummary: OrderSummary[];
 }
 
 function statusIcon(item: StockItem) {
@@ -99,6 +108,34 @@ export default function DashboardPage() {
               <span key={s.productId} className="bg-yellow-100 text-yellow-700 text-sm px-3 py-1 rounded-full">
                 {s.name} ({s.available})
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Order Summary by type/slot/dough */}
+      {(data?.orderSummary?.length ?? 0) > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-50">
+            <h2 className="font-semibold text-gray-700">สรุปยอดออเดอร์วันนี้</h2>
+            <p className="text-xs text-gray-400 mt-0.5">แยกตามประเภท · รอบ · แป้ง</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {data!.orderSummary.map((s, i) => (
+              <div key={i} className="flex items-center px-4 py-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.orderType === "WALKIN" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
+                      {s.orderType === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}
+                    </span>
+                    {s.slotTime && <span className="text-xs text-gray-500">{s.slotTime}</span>}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {s.doughType === "PUMPKIN" ? "🟡 แป้งฟักทอง" : "⚪ แป้งโมจิ"}
+                  </p>
+                </div>
+                <p className="text-lg font-bold text-gray-800">{s.quantity} <span className="text-xs font-normal text-gray-400">ชิ้น</span></p>
+              </div>
             ))}
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 
 interface Product { id: string; name: string; isActive: boolean; }
-interface TimeSlot { id: string; label: string; startTime: string; endTime: string; maxOrders: number; isActive: boolean; }
+interface TimeSlot { id: string; label: string; startTime: string; endTime: string; maxOrders: number; isActive: boolean; orderType: string; }
 interface User { id: string; username: string; name: string; role: string; }
 
 type AdminTab = "products" | "timeslots" | "users";
@@ -19,7 +19,7 @@ export default function AdminPage() {
   const [addingProduct, setAddingProduct] = useState(false);
 
   // New slot
-  const [newSlot, setNewSlot] = useState({ label: "", startTime: "", endTime: "", maxOrders: 20 });
+  const [newSlot, setNewSlot] = useState({ label: "", startTime: "", endTime: "", maxOrders: 20, orderType: "WALKIN" });
   const [addingSlot, setAddingSlot] = useState(false);
 
   // New user
@@ -77,7 +77,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newSlot),
     });
-    setNewSlot({ label: "", startTime: "", endTime: "", maxOrders: 20 });
+    setNewSlot({ label: "", startTime: "", endTime: "", maxOrders: 20, orderType: "WALKIN" });
     setAddingSlot(false);
     showMsg("เพิ่มรอบเวลาเรียบร้อย");
     loadData();
@@ -214,6 +214,21 @@ export default function AdminPage() {
                 min={0}
               />
             </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">ประเภทออเดอร์</label>
+              <div className="flex gap-2">
+                {[{ v: "WALKIN", l: "🟠 หน้าร้าน" }, { v: "RESERVE", l: "🔵 จอง" }].map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setNewSlot({ ...newSlot, orderType: o.v })}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${newSlot.orderType === o.v ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600"}`}
+                  >
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               type="submit"
               disabled={addingSlot}
@@ -231,7 +246,7 @@ export default function AdminPage() {
                 <div key={s.id} className="flex items-center px-4 py-3">
                   <div className="flex-1">
                     <p className="font-medium text-gray-800">{s.label}</p>
-                    <p className="text-xs text-gray-400">{s.startTime} – {s.endTime} · สูงสุด {s.maxOrders} รายการ</p>
+                    <p className="text-xs text-gray-400">{s.startTime} – {s.endTime} · สูงสุด {s.maxOrders} · {s.orderType === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}</p>
                   </div>
                   <button
                     onClick={() => deleteSlot(s.id)}
