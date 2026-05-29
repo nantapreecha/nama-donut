@@ -1,4 +1,4 @@
-import { logout } from "@/app/actions";
+import Link from "next/link";
 
 interface Props {
   name: string;
@@ -17,14 +17,12 @@ export default function TopBar({ name, role }: Props) {
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${role === "ADMIN" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"}`}>
           {role === "ADMIN" ? "Admin" : "Staff"}
         </span>
-        <form action={logout}>
-          <button
-            type="submit"
-            className="text-sm text-white bg-red-400 hover:bg-red-500 transition-colors px-3 py-1 rounded-lg font-medium"
-          >
-            ออกจากระบบ
-          </button>
-        </form>
+        <Link
+          href="/logout"
+          className="text-sm text-white bg-red-400 hover:bg-red-500 transition-colors px-3 py-1 rounded-lg font-medium"
+        >
+          ออกจากระบบ
+        </Link>
       </div>
     </header>
   );
