@@ -20,10 +20,12 @@ export default function TopBar({ name, role }: Props) {
           {role === "ADMIN" ? "Admin" : "Staff"}
         </span>
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          className="text-sm text-gray-400 hover:text-red-500 transition-colors"
+          onClick={async () => {
+            await signOut({ callbackUrl: "/login", redirect: true });
+          }}
+          className="text-sm text-white bg-red-400 hover:bg-red-500 transition-colors px-3 py-1 rounded-lg font-medium"
         >
-          ออก
+          ออกจากระบบ
         </button>
       </div>
     </header>
