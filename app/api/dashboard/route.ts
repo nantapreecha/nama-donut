@@ -2,80 +2,43 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { startOfDay } from "@/lib/dateUtils";
 
-export async function GET() {
-  const today = startOfDay(new Date());
-  const nextDay = new Date(today);
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const dateParam = searchParams.get("date");
+  const date = dateParam ? startOfDay(new Date(dateParam)) : startOfDay(new Date());
+  const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
 
-  const [stocks, pendingOrders, products, allOrders] = await Promise.all([
-    prisma.dailyStock.findMany({ where: { date: today }, include: { product: true } }),
-    prisma.order.findMany({
-      where: { pickupDate: { gte: today, lt: nextDay }, status: "PENDING" },
-      include: { customer: true, timeSlot: true, items: { include: { product: true } } },
+  const [batches, pendingOrders] = await Promise.all([
+    prisma.stockBatch.findMany({
+      where: { stockDate: date },
+      orderBy: [{ orderType: "asc" }, { roundTime: "asc" }, { doughType: "asc" }],
     }),
-    prisma.product.findMany({ where: { isActive: true } }),
-    prisma.order.findMany({
-      where: { pickupDate: { gte: today, lt: nextDay }, status: { not: "CANCELLED" } },
-      include: { timeSlot: true, items: true },
+    prisma.order.count({
+      where: { pickupDate: { gte: date, lt: nextDay }, status: "PENDING" },
     }),
   ]);
 
-  const stockMap = new Map(stocks.map((s) => [s.productId, s]));
+  const totalSold = batches.reduce((s, b) => s + b.sold, 0);
 
-  const stockSummary = products.map((p) => {
-    const s = stockMap.get(p.id);
-    const produced = s?.produced ?? 0;
-    const reserved = s?.reserved ?? 0;
-    const walkIn = s?.walkIn ?? 0;
-    const sold = reserved + walkIn;
-    const available = produced - sold;
-    return { productId: p.id, name: p.name, produced, reserved, walkIn, sold, available: Math.max(0, available) };
-  });
+  // Group by orderType + roundTime
+  type SlotKey = string;
+  const slotMap = new Map<SlotKey, { orderType: string; roundTime: string; pumpkin: { qty: number; sold: number }; mochi: { qty: number; sold: number } }>();
 
-  const totalSold = stockSummary.reduce((sum, s) => sum + s.sold, 0);
-  const lowStock = stockSummary.filter((s) => s.available > 0 && s.available <= 5);
-  const outOfStock = stockSummary.filter((s) => s.produced > 0 && s.available === 0);
-
-  // Summary grouped by orderType + timeSlot + doughType
-  type SummaryKey = string;
-  const summaryMap = new Map<SummaryKey, {
-    orderType: string;
-    slotLabel: string;
-    slotTime: string;
-    doughType: string;
-    quantity: number;
-  }>();
-
-  for (const order of allOrders) {
-    const slotLabel = order.timeSlot?.label ?? "ไม่ระบุรอบ";
-    const slotTime = order.timeSlot?.startTime ?? "";
-    const key = `${order.orderType}|${slotLabel}|${slotTime}|${order.doughType}`;
-    const qty = order.items.reduce((s, i) => s + i.quantity, 0);
-    if (summaryMap.has(key)) {
-      summaryMap.get(key)!.quantity += qty;
-    } else {
-      summaryMap.set(key, {
-        orderType: order.orderType,
-        slotLabel,
-        slotTime,
-        doughType: order.doughType,
-        quantity: qty,
-      });
+  for (const b of batches) {
+    const key = `${b.orderType}|${b.roundTime}`;
+    if (!slotMap.has(key)) {
+      slotMap.set(key, { orderType: b.orderType, roundTime: b.roundTime, pumpkin: { qty: 0, sold: 0 }, mochi: { qty: 0, sold: 0 } });
     }
+    const slot = slotMap.get(key)!;
+    if (b.doughType === "PUMPKIN") slot.pumpkin = { qty: b.qty, sold: b.sold };
+    if (b.doughType === "MOCHI") slot.mochi = { qty: b.qty, sold: b.sold };
   }
 
-  const orderSummary = Array.from(summaryMap.values()).sort((a, b) => {
+  const stockSummary = Array.from(slotMap.values()).sort((a, b) => {
     if (a.orderType !== b.orderType) return a.orderType.localeCompare(b.orderType);
-    return a.slotTime.localeCompare(b.slotTime);
+    return a.roundTime.localeCompare(b.roundTime);
   });
 
-  return NextResponse.json({
-    totalSold,
-    pendingOrdersCount: pendingOrders.length,
-    stockSummary,
-    pendingOrders,
-    lowStock,
-    outOfStock,
-    orderSummary,
-  });
+  return NextResponse.json({ totalSold, pendingOrdersCount: pendingOrders, stockSummary, date: date.toISOString() });
 }

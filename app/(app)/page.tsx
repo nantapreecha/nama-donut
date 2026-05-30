@@ -2,49 +2,37 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-interface StockItem {
-  productId: string;
-  name: string;
-  produced: number;
-  reserved: number;
-  walkIn: number;
-  sold: number;
-  available: number;
-}
-
-interface OrderSummary {
+interface SlotSummary {
   orderType: string;
-  slotLabel: string;
-  slotTime: string;
-  doughType: string;
-  quantity: number;
+  roundTime: string;
+  pumpkin: { qty: number; sold: number };
+  mochi: { qty: number; sold: number };
 }
 
 interface DashboardData {
   totalSold: number;
   pendingOrdersCount: number;
-  stockSummary: StockItem[];
-  lowStock: StockItem[];
-  outOfStock: StockItem[];
-  orderSummary: OrderSummary[];
+  stockSummary: SlotSummary[];
+  date: string;
 }
 
-function statusIcon(item: StockItem) {
-  if (item.produced === 0) return { icon: "⚪", label: "ยังไม่ตั้งสต๊อก", color: "text-gray-400" };
-  if (item.available === 0) return { icon: "🔴", label: "หมด", color: "text-red-500" };
-  if (item.available <= 5) return { icon: "🟡", label: `เหลือ ${item.available}`, color: "text-yellow-500" };
-  return { icon: "🟢", label: `เหลือ ${item.available}`, color: "text-green-600" };
+function availableColor(available: number, qty: number) {
+  if (qty === 0) return "text-gray-400";
+  if (available === 0) return "text-red-500";
+  if (available <= 5) return "text-yellow-600";
+  return "text-green-600";
 }
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/dashboard");
+    const res = await fetch(`/api/dashboard?date=${selectedDate}`);
     if (res.ok) setData(await res.json());
     setLoading(false);
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     load();
@@ -52,23 +40,26 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [load]);
 
-  const today = new Date().toLocaleDateString("th-TH", {
+  const displayDate = new Date(selectedDate + "T00:00:00").toLocaleDateString("th-TH", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400 text-lg">กำลังโหลด...</div>
-      </div>
-    );
-  }
+  const walkInSlots = data?.stockSummary.filter((s) => s.orderType === "WALKIN") ?? [];
+  const reserveSlots = data?.stockSummary.filter((s) => s.orderType === "RESERVE") ?? [];
 
   return (
     <div className="px-4 py-4 space-y-4 max-w-lg mx-auto">
-      <div>
-        <h1 className="text-xl font-bold text-gray-800">หน้าหลัก</h1>
-        <p className="text-sm text-gray-500">{today}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">สต๊อกคงเหลือ</h1>
+          <p className="text-sm text-gray-500">{displayDate}</p>
+        </div>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+        />
       </div>
 
       {/* Summary Cards */}
@@ -85,91 +76,81 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Alert: Out of stock */}
-      {(data?.outOfStock?.length ?? 0) > 0 && (
-        <div className="bg-red-50 border border-red-100 rounded-2xl p-4">
-          <p className="font-semibold text-red-600 mb-2">🔴 ของหมด</p>
-          <div className="flex flex-wrap gap-2">
-            {data!.outOfStock.map((s) => (
-              <span key={s.productId} className="bg-red-100 text-red-700 text-sm px-3 py-1 rounded-full">
-                {s.name}
-              </span>
-            ))}
-          </div>
+      {loading ? (
+        <div className="text-center text-gray-400 py-8">กำลังโหลด...</div>
+      ) : data?.stockSummary.length === 0 ? (
+        <div className="bg-white rounded-2xl p-8 text-center text-gray-400">
+          <p className="text-4xl mb-2">📦</p>
+          <p>ยังไม่มีสต๊อกวันนี้</p>
+          <p className="text-sm mt-1">ไปเติมสต๊อกที่หน้าสต๊อกก่อนนะ</p>
         </div>
-      )}
-
-      {/* Alert: Low stock */}
-      {(data?.lowStock?.length ?? 0) > 0 && (
-        <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4">
-          <p className="font-semibold text-yellow-700 mb-2">🟡 เหลือน้อย</p>
-          <div className="flex flex-wrap gap-2">
-            {data!.lowStock.map((s) => (
-              <span key={s.productId} className="bg-yellow-100 text-yellow-700 text-sm px-3 py-1 rounded-full">
-                {s.name} ({s.available})
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Order Summary by type/slot/dough */}
-      {(data?.orderSummary?.length ?? 0) > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-50">
-            <h2 className="font-semibold text-gray-700">สรุปยอดออเดอร์วันนี้</h2>
-            <p className="text-xs text-gray-400 mt-0.5">แยกตามประเภท · รอบ · แป้ง</p>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {data!.orderSummary.map((s, i) => (
-              <div key={i} className="flex items-center px-4 py-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.orderType === "WALKIN" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
-                      {s.orderType === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}
-                    </span>
-                    {s.slotTime && <span className="text-xs text-gray-500">{s.slotTime}</span>}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {s.doughType === "PUMPKIN" ? "🟡 แป้งฟักทอง" : "⚪ แป้งโมจิ"}
-                  </p>
-                </div>
-                <p className="text-lg font-bold text-gray-800">{s.quantity} <span className="text-xs font-normal text-gray-400">ชิ้น</span></p>
+      ) : (
+        <>
+          {/* Walk-in */}
+          {walkInSlots.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-orange-50 bg-orange-50">
+                <h2 className="font-semibold text-orange-700">🟠 หน้าร้าน</h2>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <div className="divide-y divide-gray-50">
+                {walkInSlots.map((slot) => (
+                  <div key={slot.roundTime} className="px-4 py-3">
+                    <p className="font-medium text-gray-700 mb-2">รอบ {slot.roundTime}</p>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-400">🟡 แป้งฟักทอง</p>
+                        <p className={`text-lg font-bold ${availableColor(slot.pumpkin.qty - slot.pumpkin.sold, slot.pumpkin.qty)}`}>
+                          {slot.pumpkin.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.pumpkin.qty - slot.pumpkin.sold)}`}
+                          {slot.pumpkin.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.pumpkin.qty} ชิ้น</span>}
+                        </p>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-400">⚪ แป้งโมจิ</p>
+                        <p className={`text-lg font-bold ${availableColor(slot.mochi.qty - slot.mochi.sold, slot.mochi.qty)}`}>
+                          {slot.mochi.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.mochi.qty - slot.mochi.sold)}`}
+                          {slot.mochi.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.mochi.qty} ชิ้น</span>}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Stock Summary */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-50">
-          <h2 className="font-semibold text-gray-700">สต๊อกวันนี้</h2>
-        </div>
-        {(data?.stockSummary ?? []).length === 0 ? (
-          <p className="text-center text-gray-400 py-8">ยังไม่มีสินค้า</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {data!.stockSummary.map((item) => {
-              const { icon, label, color } = statusIcon(item);
-              return (
-                <div key={item.productId} className="flex items-center px-4 py-3">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{item.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      ผลิต {item.produced} ชิ้น · จอง {item.reserved} ชิ้น · หน้าร้าน {item.walkIn} ชิ้น
-                    </p>
+          {/* Reserve */}
+          {reserveSlots.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-blue-50 bg-blue-50">
+                <h2 className="font-semibold text-blue-700">🔵 จอง</h2>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {reserveSlots.map((slot) => (
+                  <div key={slot.roundTime} className="px-4 py-3">
+                    <p className="font-medium text-gray-700 mb-2">รอบ {slot.roundTime}</p>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-400">🟡 แป้งฟักทอง</p>
+                        <p className={`text-lg font-bold ${availableColor(slot.pumpkin.qty - slot.pumpkin.sold, slot.pumpkin.qty)}`}>
+                          {slot.pumpkin.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.pumpkin.qty - slot.pumpkin.sold)}`}
+                          {slot.pumpkin.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.pumpkin.qty} ชิ้น</span>}
+                        </p>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-400">⚪ แป้งโมจิ</p>
+                        <p className={`text-lg font-bold ${availableColor(slot.mochi.qty - slot.mochi.sold, slot.mochi.qty)}`}>
+                          {slot.mochi.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.mochi.qty - slot.mochi.sold)}`}
+                          {slot.mochi.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.mochi.qty} ชิ้น</span>}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-lg">{icon}</span>
-                    <p className={`text-xs font-medium ${color}`}>{label}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

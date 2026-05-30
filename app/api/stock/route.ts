@@ -1,51 +1,43 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { startOfDay } from "@/lib/dateUtils";
+import { startOfDay, getTimeSlots } from "@/lib/dateUtils";
 
+// GET /api/stock?date=2024-01-01
+// Returns all StockBatch for the date with available qty
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const dateParam = searchParams.get("date");
-  const date = dateParam ? new Date(dateParam) : startOfDay(new Date());
+  const date = dateParam ? startOfDay(new Date(dateParam)) : startOfDay(new Date());
 
-  const products = await prisma.product.findMany({
-    where: { isActive: true },
-    orderBy: { name: "asc" },
+  const batches = await prisma.stockBatch.findMany({
+    where: { stockDate: date },
+    orderBy: [{ orderType: "asc" }, { roundTime: "asc" }, { doughType: "asc" }],
   });
 
-  const stocks = await prisma.dailyStock.findMany({
-    where: { date },
-  });
-
-  const stockMap = new Map(stocks.map((s) => [s.productId, s]));
-
-  const result = products.map((p) => {
-    const s = stockMap.get(p.id);
-    const produced = s?.produced ?? 0;
-    const reserved = s?.reserved ?? 0;
-    const walkIn = s?.walkIn ?? 0;
-    const available = produced - reserved - walkIn;
-    return {
-      productId: p.id,
-      name: p.name,
-      produced,
-      reserved,
-      walkIn,
-      available: Math.max(0, available),
-    };
-  });
+  const result = batches.map((b) => ({
+    id: b.id,
+    stockDate: b.stockDate,
+    orderType: b.orderType,
+    roundTime: b.roundTime,
+    doughType: b.doughType,
+    qty: b.qty,
+    sold: b.sold,
+    available: Math.max(0, b.qty - b.sold),
+  }));
 
   return NextResponse.json(result);
 }
 
+// POST /api/stock — upsert StockBatch
 export async function POST(req: Request) {
-  const { productId, produced, date: dateParam } = await req.json();
-  const date = dateParam ? new Date(dateParam) : startOfDay(new Date());
+  const { stockDate: dateParam, orderType, roundTime, doughType, qty } = await req.json();
+  const stockDate = dateParam ? startOfDay(new Date(dateParam)) : startOfDay(new Date());
 
-  const stock = await prisma.dailyStock.upsert({
-    where: { date_productId: { date, productId } },
-    update: { produced },
-    create: { date, productId, produced },
+  const batch = await prisma.stockBatch.upsert({
+    where: { stockDate_orderType_roundTime_doughType: { stockDate, orderType, roundTime, doughType } },
+    update: { qty },
+    create: { stockDate, orderType, roundTime, doughType, qty },
   });
 
-  return NextResponse.json(stock);
+  return NextResponse.json(batch);
 }

@@ -9,7 +9,6 @@ interface Props {
 
 const navItems = [
   { href: "/", label: "หน้าหลัก", icon: "📊" },
-  { href: "/pos", label: "ขายหน้าร้าน", icon: "💰" },
   { href: "/orders", label: "ออเดอร์", icon: "📋" },
   { href: "/stock", label: "สต๊อก", icon: "📦" },
   { href: "/admin", label: "ตั้งค่า", icon: "⚙️", adminOnly: true },

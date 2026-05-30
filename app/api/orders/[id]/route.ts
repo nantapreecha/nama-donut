@@ -6,38 +6,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const { status } = await req.json();
 
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: { items: true },
-  });
+  const order = await prisma.order.findUnique({ where: { id } });
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const today = startOfDay(new Date());
+  const pickup = order.pickupDate ?? startOfDay(new Date());
 
   const updated = await prisma.$transaction(async (tx) => {
     const updatedOrder = await tx.order.update({
       where: { id },
       data: { status },
-      include: { customer: true, timeSlot: true, items: { include: { product: true } } },
+      include: { customer: true },
     });
 
-    if (status === "CANCELLED" && order.status !== "CANCELLED") {
-      for (const item of order.items) {
-        await tx.dailyStock.updateMany({
-          where: { date: today, productId: item.productId },
-          data: { reserved: { decrement: item.quantity } },
+    // คืน stock เมื่อยกเลิก
+    if (status === "CANCELLED" && order.status !== "CANCELLED" && order.roundTime) {
+      if (order.pumpkinQty > 0) {
+        await tx.stockBatch.updateMany({
+          where: { stockDate: pickup, orderType: order.orderType, roundTime: order.roundTime, doughType: "PUMPKIN" },
+          data: { sold: { decrement: order.pumpkinQty } },
         });
       }
-    }
-
-    if (status === "COMPLETED" && order.status !== "COMPLETED") {
-      for (const item of order.items) {
-        await tx.dailyStock.updateMany({
-          where: { date: today, productId: item.productId },
-          data: {
-            reserved: { decrement: item.quantity },
-            walkIn: { increment: item.quantity },
-          },
+      if (order.mochiQty > 0) {
+        await tx.stockBatch.updateMany({
+          where: { stockDate: pickup, orderType: order.orderType, roundTime: order.roundTime, doughType: "MOCHI" },
+          data: { sold: { decrement: order.mochiQty } },
         });
       }
     }

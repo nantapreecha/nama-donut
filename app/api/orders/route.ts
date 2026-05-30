@@ -6,62 +6,49 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const dateParam = searchParams.get("date");
   const status = searchParams.get("status");
-  const date = dateParam ? new Date(dateParam) : startOfDay(new Date());
+  const date = dateParam ? startOfDay(new Date(dateParam)) : startOfDay(new Date());
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
 
-  const where: any = {
-    pickupDate: { gte: date, lt: nextDay },
-  };
+  const where: any = { pickupDate: { gte: date, lt: nextDay } };
   if (status) where.status = status;
 
   const orders = await prisma.order.findMany({
     where,
-    include: {
-      customer: true,
-      timeSlot: true,
-      items: { include: { product: true } },
-    },
-    orderBy: { createdAt: "desc" },
+    include: { customer: true },
+    orderBy: [{ roundTime: "asc" }, { createdAt: "asc" }],
   });
 
   return NextResponse.json(orders);
 }
 
 export async function POST(req: Request) {
-  const { customerId, timeSlotId, pickupDate, channel, orderType, doughType, note, items } = await req.json();
+  const { customerId, pickupDate, channel, orderType, roundTime, pumpkinQty, mochiQty, note } = await req.json();
 
-  const today = startOfDay(new Date());
-  const pickup = pickupDate ? new Date(pickupDate) : today;
+  const pickup = pickupDate ? startOfDay(new Date(pickupDate)) : startOfDay(new Date());
 
-  // Check stock for each item
-  for (const item of items) {
-    const stock = await prisma.dailyStock.findUnique({
-      where: { date_productId: { date: today, productId: item.productId } },
+  if (!roundTime) return NextResponse.json({ error: "กรุณาเลือกรอบเวลา" }, { status: 400 });
+  if ((pumpkinQty ?? 0) + (mochiQty ?? 0) === 0) return NextResponse.json({ error: "กรุณาระบุจำนวนอย่างน้อย 1 ชิ้น" }, { status: 400 });
+
+  // Check stock for pumpkin
+  if (pumpkinQty > 0) {
+    const batch = await prisma.stockBatch.findUnique({
+      where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "PUMPKIN" } },
     });
-    const produced = stock?.produced ?? 0;
-    const reserved = stock?.reserved ?? 0;
-    const walkIn = stock?.walkIn ?? 0;
-    const available = produced - reserved - walkIn;
-    if (available < item.quantity) {
-      const product = await prisma.product.findUnique({ where: { id: item.productId } });
-      return NextResponse.json(
-        { error: `${product?.name ?? item.productId} เหลือแค่ ${Math.max(0, available)} ชิ้น` },
-        { status: 400 }
-      );
+    const available = Math.max(0, (batch?.qty ?? 0) - (batch?.sold ?? 0));
+    if (available < pumpkinQty) {
+      return NextResponse.json({ error: `แป้งฟักทองรอบ ${roundTime} เหลือแค่ ${available} ชิ้น` }, { status: 400 });
     }
   }
 
-  // Check timeslot capacity
-  if (timeSlotId) {
-    const slot = await prisma.timeSlot.findUnique({ where: { id: timeSlotId } });
-    if (slot && slot.maxOrders > 0) {
-      const count = await prisma.order.count({
-        where: { timeSlotId, pickupDate: pickup, status: { not: "CANCELLED" } },
-      });
-      if (count >= slot.maxOrders) {
-        return NextResponse.json({ error: "รอบนี้เต็มแล้ว" }, { status: 400 });
-      }
+  // Check stock for mochi
+  if (mochiQty > 0) {
+    const batch = await prisma.stockBatch.findUnique({
+      where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "MOCHI" } },
+    });
+    const available = Math.max(0, (batch?.qty ?? 0) - (batch?.sold ?? 0));
+    if (available < mochiQty) {
+      return NextResponse.json({ error: `แป้งโมจิรอบ ${roundTime} เหลือแค่ ${available} ชิ้น` }, { status: 400 });
     }
   }
 
@@ -69,23 +56,30 @@ export async function POST(req: Request) {
     const newOrder = await tx.order.create({
       data: {
         customerId,
-        timeSlotId,
         pickupDate: pickup,
         channel,
         orderType: orderType ?? "WALKIN",
-        doughType: doughType ?? "PUMPKIN",
+        roundTime,
+        pumpkinQty: pumpkinQty ?? 0,
+        mochiQty: mochiQty ?? 0,
         note,
-        items: { create: items.map((i: any) => ({ productId: i.productId, quantity: i.quantity })) },
       },
-      include: { customer: true, timeSlot: true, items: { include: { product: true } } },
+      include: { customer: true },
     });
 
-    // Reserve stock
-    for (const item of items) {
-      await tx.dailyStock.upsert({
-        where: { date_productId: { date: today, productId: item.productId } },
-        update: { reserved: { increment: item.quantity } },
-        create: { date: today, productId: item.productId, reserved: item.quantity },
+    // Deduct stock from StockBatch
+    if (pumpkinQty > 0) {
+      await tx.stockBatch.upsert({
+        where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "PUMPKIN" } },
+        update: { sold: { increment: pumpkinQty } },
+        create: { stockDate: pickup, orderType, roundTime, doughType: "PUMPKIN", qty: 0, sold: pumpkinQty },
+      });
+    }
+    if (mochiQty > 0) {
+      await tx.stockBatch.upsert({
+        where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "MOCHI" } },
+        update: { sold: { increment: mochiQty } },
+        create: { stockDate: pickup, orderType, roundTime, doughType: "MOCHI", qty: 0, sold: mochiQty },
       });
     }
 

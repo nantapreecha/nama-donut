@@ -1,150 +1,160 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { getTimeSlots } from "@/lib/dateUtils";
 
-interface StockItem {
-  productId: string;
-  name: string;
-  produced: number;
-  reserved: number;
-  walkIn: number;
-  available: number;
-}
+interface BatchKey { orderType: string; roundTime: string; doughType: string; }
+interface StockBatch extends BatchKey { qty: number; sold: number; available: number; }
+
+const DOUGH_TYPES = [
+  { value: "PUMPKIN", label: "🟡 แป้งฟักทอง" },
+  { value: "MOCHI", label: "⚪ แป้งโมจิ" },
+];
 
 export default function StockPage() {
-  const [stock, setStock] = useState<StockItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [batches, setBatches] = useState<StockBatch[]>([]);
   const [editing, setEditing] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
 
-  const loadStock = useCallback(async () => {
-    const res = await fetch("/api/stock");
-    if (res.ok) setStock(await res.json());
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/stock?date=${selectedDate}`);
+    if (res.ok) setBatches(await res.json());
     setLoading(false);
-  }, []);
+  }, [selectedDate]);
 
-  useEffect(() => {
-    loadStock();
-    const interval = setInterval(loadStock, 5000);
-    return () => clearInterval(interval);
-  }, [loadStock]);
+  useEffect(() => { load(); }, [load]);
 
-  function getEditing(productId: string, produced: number) {
-    return editing[productId] !== undefined ? editing[productId] : produced;
+  const date = new Date(selectedDate + "T00:00:00");
+  const walkInSlots = getTimeSlots(date, "WALKIN");
+  const reserveSlots = getTimeSlots(date, "RESERVE");
+
+  function batchKey(orderType: string, roundTime: string, doughType: string) {
+    return `${orderType}|${roundTime}|${doughType}`;
   }
 
-  async function saveStock(productId: string) {
-    const produced = editing[productId];
-    if (produced === undefined) return;
-    setSaving((s) => ({ ...s, [productId]: true }));
+  function getBatch(orderType: string, roundTime: string, doughType: string): StockBatch | undefined {
+    return batches.find((b) => b.orderType === orderType && b.roundTime === roundTime && b.doughType === doughType);
+  }
+
+  function getQty(orderType: string, roundTime: string, doughType: string): number {
+    const key = batchKey(orderType, roundTime, doughType);
+    if (editing[key] !== undefined) return editing[key];
+    return getBatch(orderType, roundTime, doughType)?.qty ?? 0;
+  }
+
+  function setEdit(orderType: string, roundTime: string, doughType: string, val: number) {
+    setEditing((e) => ({ ...e, [batchKey(orderType, roundTime, doughType)]: Math.max(0, val) }));
+  }
+
+  async function save(orderType: string, roundTime: string, doughType: string) {
+    const key = batchKey(orderType, roundTime, doughType);
+    const qty = editing[key];
+    if (qty === undefined) return;
+    setSaving((s) => ({ ...s, [key]: true }));
     await fetch("/api/stock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId, produced }),
+      body: JSON.stringify({ stockDate: selectedDate, orderType, roundTime, doughType, qty }),
     });
-    setSaving((s) => ({ ...s, [productId]: false }));
-    setSaved((s) => ({ ...s, [productId]: true }));
-    setEditing((e) => { const n = { ...e }; delete n[productId]; return n; });
-    loadStock();
-    setTimeout(() => setSaved((s) => ({ ...s, [productId]: false })), 2000);
+    setSaving((s) => ({ ...s, [key]: false }));
+    setSaved((s) => ({ ...s, [key]: true }));
+    setEditing((e) => { const n = { ...e }; delete n[key]; return n; });
+    load();
+    setTimeout(() => setSaved((s) => ({ ...s, [key]: false })), 2000);
   }
 
-  const today = new Date().toLocaleDateString("th-TH", {
+  const displayDate = date.toLocaleDateString("th-TH", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">กำลังโหลด...</div>;
-
-  const totalProduced = stock.reduce((s, i) => s + i.produced, 0);
-  const totalSold = stock.reduce((s, i) => s + i.reserved + i.walkIn, 0);
+  function renderSlotGroup(orderType: "WALKIN" | "RESERVE", slots: string[]) {
+    const isWalkIn = orderType === "WALKIN";
+    return (
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className={`px-4 py-3 border-b ${isWalkIn ? "bg-orange-50 border-orange-50" : "bg-blue-50 border-blue-50"}`}>
+          <h2 className={`font-semibold ${isWalkIn ? "text-orange-700" : "text-blue-700"}`}>
+            {isWalkIn ? "🟠 หน้าร้าน" : "🔵 จอง"}
+          </h2>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {slots.map((roundTime) => (
+            <div key={roundTime} className="px-4 py-3 space-y-3">
+              <p className="font-medium text-gray-700">รอบ {roundTime}</p>
+              {DOUGH_TYPES.map(({ value: doughType, label }) => {
+                const key = batchKey(orderType, roundTime, doughType);
+                const qty = getQty(orderType, roundTime, doughType);
+                const batch = getBatch(orderType, roundTime, doughType);
+                const isDirty = editing[key] !== undefined;
+                return (
+                  <div key={doughType}>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm text-gray-600">{label}</p>
+                      <div className="flex items-center gap-2">
+                        {saved[key] && <span className="text-xs text-green-600">✓ บันทึกแล้ว</span>}
+                        {batch && <span className="text-xs text-gray-400">ขายแล้ว {batch.sold} ชิ้น</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEdit(orderType, roundTime, doughType, qty - 1)}
+                        className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 text-xl font-bold"
+                      >−</button>
+                      <input
+                        type="number"
+                        min={0}
+                        value={qty}
+                        onChange={(e) => setEdit(orderType, roundTime, doughType, parseInt(e.target.value) || 0)}
+                        className="w-16 text-center text-lg font-bold border border-gray-200 rounded-xl py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                      <button
+                        onClick={() => setEdit(orderType, roundTime, doughType, qty + 1)}
+                        className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xl font-bold"
+                      >+</button>
+                      <span className="text-xs text-gray-400">ชิ้น</span>
+                      <button
+                        onClick={() => save(orderType, roundTime, doughType)}
+                        disabled={!isDirty || saving[key]}
+                        className={`ml-auto px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDirty ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-400"}`}
+                      >
+                        {saving[key] ? "..." : "บันทึก"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-gray-800">จัดการสต๊อก</h1>
-        <p className="text-sm text-gray-500">{today}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">จัดการสต๊อก</h1>
+          <p className="text-sm text-gray-500">{displayDate}</p>
+        </div>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => { setSelectedDate(e.target.value); setEditing({}); }}
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+        />
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-orange-50 rounded-2xl p-3 text-center">
-          <p className="text-2xl font-bold text-orange-700">{totalProduced}</p>
-          <p className="text-xs text-orange-500 mt-0.5">ผลิตทั้งหมด</p>
-        </div>
-        <div className="bg-green-50 rounded-2xl p-3 text-center">
-          <p className="text-2xl font-bold text-green-700">{totalSold}</p>
-          <p className="text-xs text-green-500 mt-0.5">ขายแล้ว</p>
-        </div>
-        <div className="bg-blue-50 rounded-2xl p-3 text-center">
-          <p className="text-2xl font-bold text-blue-700">{stock.reduce((s, i) => s + i.available, 0)}</p>
-          <p className="text-xs text-blue-500 mt-0.5">คงเหลือ</p>
-        </div>
-      </div>
-
-      {/* Stock List */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-50">
-          <p className="font-semibold text-gray-700">ตั้งจำนวนผลิต</p>
-          <p className="text-xs text-gray-400 mt-0.5">รีเซ็ตทุกวันเช้า — กดบันทึกหลังแก้ไข</p>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {stock.map((item) => {
-            const val = getEditing(item.productId, item.produced);
-            const isDirty = editing[item.productId] !== undefined;
-
-            return (
-              <div key={item.productId} className="px-4 py-3">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-medium text-gray-800">{item.name}</p>
-                  {saved[item.productId] && (
-                    <span className="text-xs text-green-600 font-medium">✓ บันทึกแล้ว</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 flex-1">
-                    <button
-                      onClick={() => setEditing((e) => ({ ...e, [item.productId]: Math.max(0, val - 1) }))}
-                      className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 text-xl font-bold"
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      min={0}
-                      value={val}
-                      onChange={(e) => setEditing((ed) => ({ ...ed, [item.productId]: parseInt(e.target.value) || 0 }))}
-                      className="w-16 text-center text-xl font-bold border border-gray-200 rounded-xl py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
-                    />
-                    <button
-                      onClick={() => setEditing((e) => ({ ...e, [item.productId]: val + 1 }))}
-                      className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xl font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => saveStock(item.productId)}
-                    disabled={!isDirty || saving[item.productId]}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                      isDirty ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-400"
-                    }`}
-                  >
-                    {saving[item.productId] ? "..." : "บันทึก"}
-                  </button>
-                </div>
-                <div className="flex gap-3 mt-2 text-xs text-gray-400">
-                  <span>จอง {item.reserved} ชิ้น</span>
-                  <span>หน้าร้าน {item.walkIn} ชิ้น</span>
-                  <span className={`font-medium ${item.available <= 0 ? "text-red-500" : item.available <= 5 ? "text-yellow-600" : "text-green-600"}`}>
-                    เหลือ {item.available} ชิ้น
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {loading ? (
+        <div className="text-center text-gray-400 py-8">กำลังโหลด...</div>
+      ) : (
+        <>
+          {renderSlotGroup("WALKIN", walkInSlots)}
+          {renderSlotGroup("RESERVE", reserveSlots)}
+        </>
+      )}
     </div>
   );
 }
