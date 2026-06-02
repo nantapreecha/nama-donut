@@ -69,17 +69,28 @@ model DailyStock {
 }
 
 model StockBatch {
-  id        String    @id @default(cuid())
-  stockDate DateTime  @db.Date
+  id        String         @id @default(cuid())
+  stockDate DateTime       @db.Date
   orderType OrderType
   roundTime String
   doughType DoughType
-  qty       Int       @default(0)
-  sold      Int       @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  qty       Int            @default(0)
+  sold      Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  history   StockHistory[]
 
   @@unique([stockDate, orderType, roundTime, doughType])
+}
+
+model StockHistory {
+  id           String     @id @default(cuid())
+  stockBatch   StockBatch @relation(fields: [stockBatchId], references: [id])
+  stockBatchId String
+  amount       Int
+  note         String?
+  createdBy    String?
+  createdAt    DateTime   @default(now())
 }
 
 model Customer {

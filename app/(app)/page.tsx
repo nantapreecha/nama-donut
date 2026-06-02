@@ -2,6 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 
+interface Order {
+  id: string;
+  customer: { name: string; phone: string };
+  orderType: string;
+  roundTime: string | null;
+  pumpkinQty: number;
+  mochiQty: number;
+  channel: string;
+  status: string;
+  note: string | null;
+}
+
 interface SlotSummary {
   orderType: string;
   roundTime: string;
@@ -13,11 +25,16 @@ interface DashboardData {
   totalSold: number;
   pendingOrdersCount: number;
   stockSummary: SlotSummary[];
+  orders: Order[];
   date: string;
 }
 
+const CHANNEL_LABEL: Record<string, string> = {
+  FACEBOOK: "Facebook", LINE: "LINE", PHONE: "โทรศัพท์", WALK_IN: "หน้าร้าน", OTHER: "อื่นๆ",
+};
+
 function availableColor(available: number, qty: number) {
-  if (qty === 0) return "text-gray-400";
+  if (qty === 0) return "text-gray-300";
   if (available === 0) return "text-red-500";
   if (available <= 5) return "text-yellow-600";
   return "text-green-600";
@@ -27,6 +44,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/dashboard?date=${selectedDate}`);
@@ -40,18 +58,34 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [load]);
 
+  async function toggleStatus(order: Order) {
+    const next = order.status === "PENDING" ? "COMPLETED" : "PENDING";
+    setToggling(order.id);
+    await fetch(`/api/orders/${order.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: next }),
+    });
+    setToggling(null);
+    load();
+  }
+
   const displayDate = new Date(selectedDate + "T00:00:00").toLocaleDateString("th-TH", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
-  const walkInSlots = data?.stockSummary.filter((s) => s.orderType === "WALKIN") ?? [];
-  const reserveSlots = data?.stockSummary.filter((s) => s.orderType === "RESERVE") ?? [];
+  // รวม slot จาก stock + orders เรียงตาม roundTime
+  const allRoundTimes = Array.from(new Set([
+    ...(data?.stockSummary.map((s) => s.roundTime) ?? []),
+    ...(data?.orders.map((o) => o.roundTime).filter(Boolean) as string[] ?? []),
+  ])).sort();
 
   return (
     <div className="px-4 py-4 space-y-4 max-w-lg mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">สต๊อกคงเหลือ</h1>
+          <h1 className="text-xl font-bold text-gray-800">หน้าหลัก</h1>
           <p className="text-sm text-gray-500">{displayDate}</p>
         </div>
         <input
@@ -70,7 +104,7 @@ export default function DashboardPage() {
           <p className="text-xs text-orange-500">ชิ้น</p>
         </div>
         <div className="bg-blue-50 rounded-2xl p-4">
-          <p className="text-sm text-blue-600 font-medium">ออเดอร์รอรับ</p>
+          <p className="text-sm text-blue-600 font-medium">รอรับสินค้า</p>
           <p className="text-3xl font-bold text-blue-700 mt-1">{data?.pendingOrdersCount ?? 0}</p>
           <p className="text-xs text-blue-500">รายการ</p>
         </div>
@@ -78,78 +112,120 @@ export default function DashboardPage() {
 
       {loading ? (
         <div className="text-center text-gray-400 py-8">กำลังโหลด...</div>
-      ) : data?.stockSummary.length === 0 ? (
+      ) : allRoundTimes.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 text-center text-gray-400">
-          <p className="text-4xl mb-2">📦</p>
-          <p>ยังไม่มีสต๊อกวันนี้</p>
-          <p className="text-sm mt-1">ไปเติมสต๊อกที่หน้าสต๊อกก่อนนะ</p>
+          <p className="text-4xl mb-2">📋</p>
+          <p>ยังไม่มีข้อมูลวันนี้</p>
         </div>
       ) : (
-        <>
-          {/* Walk-in */}
-          {walkInSlots.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-orange-50 bg-orange-50">
-                <h2 className="font-semibold text-orange-700">🟠 หน้าร้าน</h2>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {walkInSlots.map((slot) => (
-                  <div key={slot.roundTime} className="px-4 py-3">
-                    <p className="font-medium text-gray-700 mb-2">รอบ {slot.roundTime}</p>
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-400">🟡 แป้งฟักทอง</p>
-                        <p className={`text-lg font-bold ${availableColor(slot.pumpkin.qty - slot.pumpkin.sold, slot.pumpkin.qty)}`}>
-                          {slot.pumpkin.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.pumpkin.qty - slot.pumpkin.sold)}`}
-                          {slot.pumpkin.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.pumpkin.qty} ชิ้น</span>}
-                        </p>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-400">⚪ แป้งโมจิ</p>
-                        <p className={`text-lg font-bold ${availableColor(slot.mochi.qty - slot.mochi.sold, slot.mochi.qty)}`}>
-                          {slot.mochi.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.mochi.qty - slot.mochi.sold)}`}
-                          {slot.mochi.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.mochi.qty} ชิ้น</span>}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        allRoundTimes.map((roundTime) => {
+          const ordersInSlot = (data?.orders ?? []).filter((o) => o.roundTime === roundTime);
+          const walkInStock = data?.stockSummary.find((s) => s.roundTime === roundTime && s.orderType === "WALKIN");
+          const reserveStock = data?.stockSummary.find((s) => s.roundTime === roundTime && s.orderType === "RESERVE");
+          const walkInOrders = ordersInSlot.filter((o) => o.orderType === "WALKIN");
+          const reserveOrders = ordersInSlot.filter((o) => o.orderType === "RESERVE");
+          const hasContent = walkInStock || reserveStock || ordersInSlot.length > 0;
+          if (!hasContent) return null;
 
-          {/* Reserve */}
-          {reserveSlots.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-blue-50 bg-blue-50">
-                <h2 className="font-semibold text-blue-700">🔵 จอง</h2>
+          return (
+            <div key={roundTime} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              {/* Slot header */}
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                <p className="font-bold text-gray-800 text-base">🕐 {roundTime}</p>
+                <div className="flex gap-3 text-xs">
+                  {walkInStock && (
+                    <span className="text-orange-600">
+                      🟠 ฟ.{Math.max(0, walkInStock.pumpkin.qty - walkInStock.pumpkin.sold)} / ม.{Math.max(0, walkInStock.mochi.qty - walkInStock.mochi.sold)}
+                    </span>
+                  )}
+                  {reserveStock && (
+                    <span className="text-blue-600">
+                      🔵 ฟ.{Math.max(0, reserveStock.pumpkin.qty - reserveStock.pumpkin.sold)} / ม.{Math.max(0, reserveStock.mochi.qty - reserveStock.mochi.sold)}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="divide-y divide-gray-50">
-                {reserveSlots.map((slot) => (
-                  <div key={slot.roundTime} className="px-4 py-3">
-                    <p className="font-medium text-gray-700 mb-2">รอบ {slot.roundTime}</p>
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-400">🟡 แป้งฟักทอง</p>
-                        <p className={`text-lg font-bold ${availableColor(slot.pumpkin.qty - slot.pumpkin.sold, slot.pumpkin.qty)}`}>
-                          {slot.pumpkin.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.pumpkin.qty - slot.pumpkin.sold)}`}
-                          {slot.pumpkin.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.pumpkin.qty} ชิ้น</span>}
-                        </p>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-400">⚪ แป้งโมจิ</p>
-                        <p className={`text-lg font-bold ${availableColor(slot.mochi.qty - slot.mochi.sold, slot.mochi.qty)}`}>
-                          {slot.mochi.qty === 0 ? "—" : `เหลือ ${Math.max(0, slot.mochi.qty - slot.mochi.sold)}`}
-                          {slot.mochi.qty > 0 && <span className="text-xs font-normal text-gray-400"> /{slot.mochi.qty} ชิ้น</span>}
-                        </p>
+
+              {/* Stock remaining detail */}
+              {(walkInStock || reserveStock) && (
+                <div className="px-4 py-2 border-b border-gray-50 flex gap-4">
+                  {walkInStock && (
+                    <div className="flex-1 bg-orange-50 rounded-xl p-2">
+                      <p className="text-xs text-orange-600 font-medium mb-1">🟠 หน้าร้าน</p>
+                      <div className="flex gap-2 text-xs">
+                        <span className={`font-semibold ${availableColor(walkInStock.pumpkin.qty - walkInStock.pumpkin.sold, walkInStock.pumpkin.qty)}`}>
+                          🟡 เหลือ {Math.max(0, walkInStock.pumpkin.qty - walkInStock.pumpkin.sold)} ชิ้น
+                        </span>
+                        <span className={`font-semibold ${availableColor(walkInStock.mochi.qty - walkInStock.mochi.sold, walkInStock.mochi.qty)}`}>
+                          ⚪ เหลือ {Math.max(0, walkInStock.mochi.qty - walkInStock.mochi.sold)} ชิ้น
+                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  )}
+                  {reserveStock && (
+                    <div className="flex-1 bg-blue-50 rounded-xl p-2">
+                      <p className="text-xs text-blue-600 font-medium mb-1">🔵 จอง</p>
+                      <div className="flex gap-2 text-xs">
+                        <span className={`font-semibold ${availableColor(reserveStock.pumpkin.qty - reserveStock.pumpkin.sold, reserveStock.pumpkin.qty)}`}>
+                          🟡 เหลือ {Math.max(0, reserveStock.pumpkin.qty - reserveStock.pumpkin.sold)} ชิ้น
+                        </span>
+                        <span className={`font-semibold ${availableColor(reserveStock.mochi.qty - reserveStock.mochi.sold, reserveStock.mochi.qty)}`}>
+                          ⚪ เหลือ {Math.max(0, reserveStock.mochi.qty - reserveStock.mochi.sold)} ชิ้น
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Orders in this slot */}
+              {ordersInSlot.length > 0 && (
+                <div className="divide-y divide-gray-50">
+                  {[...walkInOrders, ...reserveOrders].map((order) => (
+                    <div key={order.id} className={`flex items-center px-4 py-3 gap-3 ${order.status === "COMPLETED" ? "opacity-50" : ""}`}>
+                      <button
+                        onClick={() => toggleStatus(order)}
+                        disabled={toggling === order.id}
+                        className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          order.status === "COMPLETED"
+                            ? "bg-green-500 border-green-500 text-white"
+                            : "border-gray-300 bg-white"
+                        }`}
+                      >
+                        {order.status === "COMPLETED" && <span className="text-xs">✓</span>}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium text-sm ${order.status === "COMPLETED" ? "line-through text-gray-400" : "text-gray-800"}`}>
+                            {order.customer.name}
+                          </p>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${order.orderType === "WALKIN" ? "bg-orange-100 text-orange-600" : "bg-blue-100 text-blue-600"}`}>
+                            {order.orderType === "WALKIN" ? "หน้าร้าน" : "จอง"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {order.pumpkinQty > 0 && `🟡${order.pumpkinQty} `}
+                          {order.mochiQty > 0 && `⚪${order.mochiQty} `}
+                          · {CHANNEL_LABEL[order.channel] ?? order.channel}
+                          {order.note ? ` · ${order.note}` : ""}
+                        </p>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${
+                        order.status === "COMPLETED" ? "bg-green-100 text-green-600" : "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {order.status === "COMPLETED" ? "รับแล้ว" : "รอรับ"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {ordersInSlot.length === 0 && (
+                <p className="px-4 py-3 text-sm text-gray-400">ไม่มีออเดอร์รอบนี้</p>
+              )}
             </div>
-          )}
-        </>
+          );
+        })
       )}
     </div>
   );

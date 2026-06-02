@@ -3,8 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { getTimeSlots } from "@/lib/dateUtils";
 
-interface BatchKey { orderType: string; roundTime: string; doughType: string; }
-interface StockBatch extends BatchKey { qty: number; sold: number; available: number; }
+interface HistoryEntry { id: string; amount: number; note: string | null; createdAt: string; createdBy: string | null; }
+interface StockBatch {
+  id: string; orderType: string; roundTime: string; doughType: string;
+  qty: number; sold: number; available: number; history: HistoryEntry[];
+}
 
 const DOUGH_TYPES = [
   { value: "PUMPKIN", label: "🟡 แป้งฟักทอง" },
@@ -14,9 +17,10 @@ const DOUGH_TYPES = [
 export default function StockPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [batches, setBatches] = useState<StockBatch[]>([]);
-  const [editing, setEditing] = useState<Record<string, number>>({});
+  const [addAmount, setAddAmount] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [showHistory, setShowHistory] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -31,39 +35,28 @@ export default function StockPage() {
   const walkInSlots = getTimeSlots(date, "WALKIN");
   const reserveSlots = getTimeSlots(date, "RESERVE");
 
-  function batchKey(orderType: string, roundTime: string, doughType: string) {
+  function key(orderType: string, roundTime: string, doughType: string) {
     return `${orderType}|${roundTime}|${doughType}`;
   }
-
-  function getBatch(orderType: string, roundTime: string, doughType: string): StockBatch | undefined {
+  function getBatch(orderType: string, roundTime: string, doughType: string) {
     return batches.find((b) => b.orderType === orderType && b.roundTime === roundTime && b.doughType === doughType);
   }
 
-  function getQty(orderType: string, roundTime: string, doughType: string): number {
-    const key = batchKey(orderType, roundTime, doughType);
-    if (editing[key] !== undefined) return editing[key];
-    return getBatch(orderType, roundTime, doughType)?.qty ?? 0;
-  }
-
-  function setEdit(orderType: string, roundTime: string, doughType: string, val: number) {
-    setEditing((e) => ({ ...e, [batchKey(orderType, roundTime, doughType)]: Math.max(0, val) }));
-  }
-
-  async function save(orderType: string, roundTime: string, doughType: string) {
-    const key = batchKey(orderType, roundTime, doughType);
-    const qty = editing[key];
-    if (qty === undefined) return;
-    setSaving((s) => ({ ...s, [key]: true }));
+  async function saveStock(orderType: string, roundTime: string, doughType: string, mode: "set" | "add") {
+    const k = key(orderType, roundTime, doughType);
+    const amount = addAmount[k] ?? 0;
+    if (amount <= 0 && mode === "add") return;
+    setSaving((s) => ({ ...s, [k]: true }));
     await fetch("/api/stock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stockDate: selectedDate, orderType, roundTime, doughType, qty }),
+      body: JSON.stringify({ stockDate: selectedDate, orderType, roundTime, doughType, amount, mode }),
     });
-    setSaving((s) => ({ ...s, [key]: false }));
-    setSaved((s) => ({ ...s, [key]: true }));
-    setEditing((e) => { const n = { ...e }; delete n[key]; return n; });
+    setSaving((s) => ({ ...s, [k]: false }));
+    setSaved((s) => ({ ...s, [k]: true }));
+    setAddAmount((a) => { const n = { ...a }; delete n[k]; return n; });
     load();
-    setTimeout(() => setSaved((s) => ({ ...s, [key]: false })), 2000);
+    setTimeout(() => setSaved((s) => ({ ...s, [k]: false })), 2000);
   }
 
   const displayDate = date.toLocaleDateString("th-TH", {
@@ -84,44 +77,78 @@ export default function StockPage() {
             <div key={roundTime} className="px-4 py-3 space-y-3">
               <p className="font-medium text-gray-700">รอบ {roundTime}</p>
               {DOUGH_TYPES.map(({ value: doughType, label }) => {
-                const key = batchKey(orderType, roundTime, doughType);
-                const qty = getQty(orderType, roundTime, doughType);
+                const k = key(orderType, roundTime, doughType);
                 const batch = getBatch(orderType, roundTime, doughType);
-                const isDirty = editing[key] !== undefined;
+                const curAdd = addAmount[k] ?? 0;
+                const currentQty = batch?.qty ?? 0;
+                const sold = batch?.sold ?? 0;
+                const available = Math.max(0, currentQty - sold);
+                const showHist = showHistory[k] ?? false;
+
                 return (
-                  <div key={doughType}>
-                    <div className="flex items-center justify-between mb-1">
+                  <div key={doughType} className="space-y-2">
+                    {/* ป้ายสรุป */}
+                    <div className="flex items-center justify-between">
                       <p className="text-sm text-gray-600">{label}</p>
-                      <div className="flex items-center gap-2">
-                        {saved[key] && <span className="text-xs text-green-600">✓ บันทึกแล้ว</span>}
-                        {batch && <span className="text-xs text-gray-400">ขายแล้ว {batch.sold} ชิ้น</span>}
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        {saved[k] && <span className="text-green-600 font-medium">✓ บันทึกแล้ว</span>}
+                        <span>สต๊อก {currentQty} · ขาย {sold} · <span className={available <= 0 ? "text-red-500 font-semibold" : available <= 5 ? "text-yellow-600 font-semibold" : "text-green-600 font-semibold"}>เหลือ {available}</span> ชิ้น</span>
                       </div>
                     </div>
+
+                    {/* ปุ่มตั้งต้น (ถ้ายังไม่มีสต๊อก) หรือเติมสต๊อก */}
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setEdit(orderType, roundTime, doughType, qty - 1)}
-                        className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 text-xl font-bold"
-                      >−</button>
+                      <button onClick={() => setAddAmount((a) => ({ ...a, [k]: Math.max(0, curAdd - 1) }))}
+                        className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 text-xl font-bold">−</button>
                       <input
-                        type="number"
-                        min={0}
-                        value={qty}
-                        onChange={(e) => setEdit(orderType, roundTime, doughType, parseInt(e.target.value) || 0)}
+                        type="number" min={0} value={curAdd}
+                        onChange={(e) => setAddAmount((a) => ({ ...a, [k]: parseInt(e.target.value) || 0 }))}
                         className="w-16 text-center text-lg font-bold border border-gray-200 rounded-xl py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
                       />
-                      <button
-                        onClick={() => setEdit(orderType, roundTime, doughType, qty + 1)}
-                        className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xl font-bold"
-                      >+</button>
+                      <button onClick={() => setAddAmount((a) => ({ ...a, [k]: curAdd + 1 }))}
+                        className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xl font-bold">+</button>
                       <span className="text-xs text-gray-400">ชิ้น</span>
-                      <button
-                        onClick={() => save(orderType, roundTime, doughType)}
-                        disabled={!isDirty || saving[key]}
-                        className={`ml-auto px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDirty ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-400"}`}
-                      >
-                        {saving[key] ? "..." : "บันทึก"}
-                      </button>
+                      <div className="ml-auto flex gap-1">
+                        {currentQty === 0 ? (
+                          <button onClick={() => saveStock(orderType, roundTime, doughType, "set")}
+                            disabled={curAdd <= 0 || saving[k]}
+                            className={`px-3 py-2 rounded-xl text-xs font-semibold ${curAdd > 0 ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-400"}`}>
+                            {saving[k] ? "..." : "ตั้งต้น"}
+                          </button>
+                        ) : (
+                          <button onClick={() => saveStock(orderType, roundTime, doughType, "add")}
+                            disabled={curAdd <= 0 || saving[k]}
+                            className={`px-3 py-2 rounded-xl text-xs font-semibold ${curAdd > 0 ? "bg-green-500 text-white" : "bg-gray-100 text-gray-400"}`}>
+                            {saving[k] ? "..." : "+ เติม"}
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* ประวัติการเติม */}
+                    {batch?.history && batch.history.length > 0 && (
+                      <div>
+                        <button onClick={() => setShowHistory((h) => ({ ...h, [k]: !showHist }))}
+                          className="text-xs text-gray-400 underline">
+                          {showHist ? "ซ่อน" : "ดู"} ประวัติ ({batch.history.length})
+                        </button>
+                        {showHist && (
+                          <div className="mt-2 space-y-1 bg-gray-50 rounded-xl p-3">
+                            {batch.history.map((h) => (
+                              <div key={h.id} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500">
+                                  {new Date(h.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+                                  {h.createdBy ? ` · ${h.createdBy}` : ""}
+                                </span>
+                                <span className={`font-semibold ${h.amount >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                  {h.amount >= 0 ? `+${h.amount}` : h.amount} ชิ้น
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -139,12 +166,9 @@ export default function StockPage() {
           <h1 className="text-xl font-bold text-gray-800">จัดการสต๊อก</h1>
           <p className="text-sm text-gray-500">{displayDate}</p>
         </div>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => { setSelectedDate(e.target.value); setEditing({}); }}
-          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
-        />
+        <input type="date" value={selectedDate}
+          onChange={(e) => { setSelectedDate(e.target.value); setAddAmount({}); }}
+          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400" />
       </div>
 
       {loading ? (
