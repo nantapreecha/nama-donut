@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { getTimeSlots } from "@/lib/dateUtils";
 
 interface HistoryEntry { id: string; amount: number; note: string | null; createdAt: string; createdBy: string | null; }
 interface StockBatch {
   id: string; orderType: string; roundTime: string; doughType: string;
   qty: number; sold: number; available: number; history: HistoryEntry[];
 }
+interface TimeSlot { id: string; label: string; startTime: string; orderType: string; }
 
 const DOUGH_TYPES = [
   { value: "PUMPKIN", label: "🟡 แป้งฟักทอง" },
@@ -17,6 +17,7 @@ const DOUGH_TYPES = [
 export default function StockPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [batches, setBatches] = useState<StockBatch[]>([]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [addAmount, setAddAmount] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
@@ -24,16 +25,19 @@ export default function StockPage() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/stock?date=${selectedDate}`);
-    if (res.ok) setBatches(await res.json());
+    const [stockRes, slotRes] = await Promise.all([
+      fetch(`/api/stock?date=${selectedDate}`),
+      fetch("/api/timeslots"),
+    ]);
+    if (stockRes.ok) setBatches(await stockRes.json());
+    if (slotRes.ok) setTimeSlots(await slotRes.json());
     setLoading(false);
   }, [selectedDate]);
 
   useEffect(() => { load(); }, [load]);
 
-  const date = new Date(selectedDate + "T00:00:00");
-  const walkInSlots = getTimeSlots(date, "WALKIN");
-  const reserveSlots = getTimeSlots(date, "RESERVE");
+  const walkInSlots = timeSlots.filter((s) => s.orderType === "WALKIN").map((s) => s.startTime);
+  const reserveSlots = timeSlots.filter((s) => s.orderType === "RESERVE").map((s) => s.startTime);
 
   function key(orderType: string, roundTime: string, doughType: string) {
     return `${orderType}|${roundTime}|${doughType}`;
@@ -42,15 +46,24 @@ export default function StockPage() {
     return batches.find((b) => b.orderType === orderType && b.roundTime === roundTime && b.doughType === doughType);
   }
 
-  async function saveStock(orderType: string, roundTime: string, doughType: string, mode: "set" | "add") {
+  async function saveStock(orderType: string, roundTime: string, doughType: string, mode: "set" | "add" | "reduce") {
     const k = key(orderType, roundTime, doughType);
     const amount = addAmount[k] ?? 0;
-    if (amount <= 0 && mode === "add") return;
+    if (amount <= 0) return;
+    const batch = getBatch(orderType, roundTime, doughType);
+    // ตรวจสต๊อกไม่ติดลบ
+    if (mode === "reduce") {
+      const newQty = (batch?.qty ?? 0) - amount;
+      if (newQty < (batch?.sold ?? 0)) {
+        alert(`ไม่สามารถลดได้ เพราะมีขายไปแล้ว ${batch?.sold ?? 0} ชิ้น`);
+        return;
+      }
+    }
     setSaving((s) => ({ ...s, [k]: true }));
     await fetch("/api/stock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stockDate: selectedDate, orderType, roundTime, doughType, amount, mode }),
+      body: JSON.stringify({ stockDate: selectedDate, orderType, roundTime, doughType, amount: mode === "reduce" ? -amount : amount, mode: mode === "reduce" ? "add" : mode }),
     });
     setSaving((s) => ({ ...s, [k]: false }));
     setSaved((s) => ({ ...s, [k]: true }));
@@ -116,11 +129,18 @@ export default function StockPage() {
                             {saving[k] ? "..." : "ตั้งต้น"}
                           </button>
                         ) : (
-                          <button onClick={() => saveStock(orderType, roundTime, doughType, "add")}
-                            disabled={curAdd <= 0 || saving[k]}
-                            className={`px-3 py-2 rounded-xl text-xs font-semibold ${curAdd > 0 ? "bg-green-500 text-white" : "bg-gray-100 text-gray-400"}`}>
-                            {saving[k] ? "..." : "+ เติม"}
-                          </button>
+                          <>
+                            <button onClick={() => saveStock(orderType, roundTime, doughType, "reduce")}
+                              disabled={curAdd <= 0 || saving[k]}
+                              className={`px-3 py-2 rounded-xl text-xs font-semibold ${curAdd > 0 ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-400"}`}>
+                              {saving[k] ? "..." : "− ลด"}
+                            </button>
+                            <button onClick={() => saveStock(orderType, roundTime, doughType, "add")}
+                              disabled={curAdd <= 0 || saving[k]}
+                              className={`px-3 py-2 rounded-xl text-xs font-semibold ${curAdd > 0 ? "bg-green-500 text-white" : "bg-gray-100 text-gray-400"}`}>
+                              {saving[k] ? "..." : "+ เติม"}
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>

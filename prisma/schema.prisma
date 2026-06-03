@@ -125,6 +125,7 @@ model Order {
   roundTime  String?
   pumpkinQty Int          @default(0)
   mochiQty   Int          @default(0)
+  isPaid     Boolean      @default(false)
   status     OrderStatus  @default(PENDING)
   note       String?
   createdAt  DateTime     @default(now())

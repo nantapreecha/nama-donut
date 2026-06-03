@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { getTimeSlots } from "@/lib/dateUtils";
 
 interface Order {
   id: string;
@@ -12,9 +11,11 @@ interface Order {
   mochiQty: number;
   channel: string;
   pickupDate: string;
+  isPaid: boolean;
   status: string;
   note: string | null;
 }
+interface TimeSlot { id: string; label: string; startTime: string; orderType: string; }
 
 const CHANNELS = [
   { value: "FACEBOOK", label: "Facebook" },
@@ -37,6 +38,7 @@ export default function OrdersPage() {
   const [mainTab, setMainTab] = useState<MainTab>("list");
   const [typeTab, setTypeTab] = useState<TypeTab>("WALKIN");
   const [orders, setOrders] = useState<Order[]>([]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Form state
@@ -55,8 +57,12 @@ export default function OrdersPage() {
   const [formSuccess, setFormSuccess] = useState("");
 
   const loadOrders = useCallback(async () => {
-    const res = await fetch("/api/orders");
-    if (res.ok) setOrders(await res.json());
+    const [ordersRes, slotsRes] = await Promise.all([
+      fetch("/api/orders"),
+      fetch("/api/timeslots"),
+    ]);
+    if (ordersRes.ok) setOrders(await ordersRes.json());
+    if (slotsRes.ok) setTimeSlots(await slotsRes.json());
     setLoading(false);
   }, []);
 
@@ -66,9 +72,8 @@ export default function OrdersPage() {
     return () => clearInterval(interval);
   }, [loadOrders]);
 
-  // คำนวณรอบเวลาจาก pickupDate และ orderType
-  const dateObj = new Date(pickupDate + "T00:00:00");
-  const availableSlots = getTimeSlots(dateObj, orderType);
+  // รอบเวลาจาก DB ตาม orderType
+  const availableSlots = timeSlots.filter((s) => s.orderType === orderType);
 
   // Reset roundTime เมื่อเปลี่ยน orderType หรือ pickupDate
   useEffect(() => { setRoundTime(""); }, [orderType, pickupDate]);
@@ -125,6 +130,15 @@ export default function OrdersPage() {
     loadOrders();
   }
 
+  async function togglePaid(orderId: string, isPaid: boolean) {
+    await fetch(`/api/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isPaid: !isPaid }),
+    });
+    loadOrders();
+  }
+
   const filteredOrders = orders.filter((o) => o.orderType === typeTab);
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">กำลังโหลด...</div>;
@@ -165,9 +179,16 @@ export default function OrdersPage() {
                       <p className="font-semibold text-gray-800">{order.customer.name}</p>
                       <p className="text-sm text-gray-500">{order.customer.phone}</p>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLOR[order.status]}`}>
-                      {STATUS_LABEL[order.status]}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLOR[order.status]}`}>
+                        {STATUS_LABEL[order.status]}
+                      </span>
+                      <button
+                        onClick={() => togglePaid(order.id, order.isPaid)}
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${order.isPaid ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {order.isPaid ? "💰 ชำระแล้ว" : "⏳ ยังไม่ชำระ"}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex gap-2 flex-wrap text-xs text-gray-500">
                     {order.roundTime && <span className="bg-gray-50 px-2 py-1 rounded-lg font-medium">รอบ {order.roundTime}</span>}
@@ -238,14 +259,18 @@ export default function OrdersPage() {
             </div>
             <div>
               <label className="text-sm text-gray-600 mb-1 block">รอบเวลา *</label>
-              <div className="flex gap-2 flex-wrap">
-                {availableSlots.map((slot) => (
-                  <button key={slot} type="button" onClick={() => setRoundTime(slot)}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${roundTime === slot ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600"}`}>
-                    {slot}
-                  </button>
-                ))}
-              </div>
+              {availableSlots.length === 0 ? (
+                <p className="text-sm text-gray-400">ยังไม่มีรอบเวลา — ให้ Admin เพิ่มที่หน้าตั้งค่า</p>
+              ) : (
+                <div className="flex gap-2 flex-wrap">
+                  {availableSlots.map((slot) => (
+                    <button key={slot.id} type="button" onClick={() => setRoundTime(slot.startTime)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${roundTime === slot.startTime ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600"}`}>
+                      {slot.label} {slot.startTime}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

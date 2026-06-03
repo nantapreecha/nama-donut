@@ -20,7 +20,9 @@ export async function POST(req: Request) {
   if ((session?.user as any)?.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const data = await req.json();
-  const slot = await prisma.timeSlot.create({ data });
+  const { label, startTime, orderType, maxOrders } = await req.json();
+  const slot = await prisma.timeSlot.create({
+    data: { label, startTime, endTime: "", orderType, maxOrders: maxOrders ?? 0 },
+  });
   return NextResponse.json(slot);
 }

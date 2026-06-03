@@ -19,7 +19,15 @@ export default function AdminPage() {
   const [addingProduct, setAddingProduct] = useState(false);
 
   // New slot
-  const [newSlot, setNewSlot] = useState({ label: "", startTime: "", endTime: "", maxOrders: 20, orderType: "WALKIN" });
+  const [newSlot, setNewSlot] = useState({ label: "", startTime: "", maxOrders: 20, orderType: "WALKIN" });
+
+  // สร้าง dropdown เลือกเวลาทุก 30 นาที ตั้งแต่ 07:00–21:00
+  const timeOptions = Array.from({ length: 29 }, (_, i) => {
+    const totalMins = 7 * 60 + i * 30;
+    const h = String(Math.floor(totalMins / 60)).padStart(2, "0");
+    const m = String(totalMins % 60).padStart(2, "0");
+    return `${h}:${m}`;
+  });
   const [addingSlot, setAddingSlot] = useState(false);
 
   // New user
@@ -84,7 +92,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newSlot),
     });
-    setNewSlot({ label: "", startTime: "", endTime: "", maxOrders: 20, orderType: "WALKIN" });
+    setNewSlot({ label: "", startTime: "", maxOrders: 20, orderType: "WALKIN" });
     setAddingSlot(false);
     showMsg("เพิ่มรอบเวลาเรียบร้อย");
     loadData();
@@ -189,66 +197,45 @@ export default function AdminPage() {
         <div className="space-y-3">
           <form onSubmit={addSlot} className="bg-white rounded-2xl p-4 space-y-3">
             <h3 className="font-semibold text-gray-700">เพิ่มรอบเวลา</h3>
-            <input
-              type="text"
-              value={newSlot.label}
-              onChange={(e) => setNewSlot({ ...newSlot, label: e.target.value })}
-              placeholder="ชื่อรอบ เช่น รอบเช้า"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
-              required
-            />
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 mb-1 block">เวลาเริ่ม</label>
-                <input
-                  type="time"
-                  value={newSlot.startTime}
-                  onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  required
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 mb-1 block">เวลาสิ้นสุด</label>
-                <input
-                  type="time"
-                  value={newSlot.endTime}
-                  onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  required
-                />
-              </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">ชื่อรอบ เช่น รอบที่ 1</label>
+              <input
+                type="text"
+                value={newSlot.label}
+                onChange={(e) => setNewSlot({ ...newSlot, label: e.target.value })}
+                placeholder="รอบที่ 1"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
+                required
+              />
             </div>
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">จำนวนสูงสุดต่อรอบ</label>
-              <input
-                type="number"
-                value={newSlot.maxOrders}
-                onChange={(e) => setNewSlot({ ...newSlot, maxOrders: parseInt(e.target.value) || 0 })}
+              <label className="text-xs text-gray-500 mb-1 block">เวลารับสินค้า</label>
+              <select
+                value={newSlot.startTime}
+                onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
-                min={0}
-              />
+                required
+              >
+                <option value="">เลือกเวลา</option>
+                {timeOptions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">ประเภทออเดอร์</label>
               <div className="flex gap-2">
                 {[{ v: "WALKIN", l: "🟠 หน้าร้าน" }, { v: "RESERVE", l: "🔵 จอง" }].map((o) => (
-                  <button
-                    key={o.v}
-                    type="button"
+                  <button key={o.v} type="button"
                     onClick={() => setNewSlot({ ...newSlot, orderType: o.v })}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${newSlot.orderType === o.v ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600"}`}
-                  >
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${newSlot.orderType === o.v ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600"}`}>
                     {o.l}
                   </button>
                 ))}
               </div>
             </div>
-            <button
-              type="submit"
-              disabled={addingSlot}
-              className="w-full bg-orange-500 text-white rounded-xl py-3 font-semibold"
-            >
+            <button type="submit" disabled={addingSlot}
+              className="w-full bg-orange-500 text-white rounded-xl py-3 font-semibold">
               เพิ่มรอบเวลา
             </button>
           </form>
@@ -260,8 +247,8 @@ export default function AdminPage() {
               slots.map((s) => (
                 <div key={s.id} className="flex items-center px-4 py-3">
                   <div className="flex-1">
-                    <p className="font-medium text-gray-800">{s.label}</p>
-                    <p className="text-xs text-gray-400">{s.startTime} – {s.endTime} · สูงสุด {s.maxOrders} · {s.orderType === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}</p>
+                    <p className="font-medium text-gray-800">{s.label} — {s.startTime}</p>
+                    <p className="text-xs text-gray-400">{s.orderType === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}</p>
                   </div>
                   <button
                     onClick={() => deleteSlot(s.id)}

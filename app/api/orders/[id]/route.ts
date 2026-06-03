@@ -4,7 +4,7 @@ import { startOfDay } from "@/lib/dateUtils";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { status } = await req.json();
+  const { status, isPaid } = await req.json();
 
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -12,9 +12,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const pickup = order.pickupDate ?? startOfDay(new Date());
 
   const updated = await prisma.$transaction(async (tx) => {
+    const updateData: any = {};
+    if (status !== undefined) updateData.status = status;
+    if (isPaid !== undefined) updateData.isPaid = isPaid;
+
     const updatedOrder = await tx.order.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: { customer: true },
     });
 
