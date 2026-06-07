@@ -29,6 +29,8 @@ export default function AdminPage() {
     return `${h}:${m}`;
   });
   const [addingSlot, setAddingSlot] = useState(false);
+  const [editingSlot, setEditingSlot] = useState<{ id: string; label: string; startTime: string; orderType: string } | null>(null);
+  const [savingSlot, setSavingSlot] = useState(false);
 
   // New user
   const [newUser, setNewUser] = useState({ username: "", password: "", name: "", role: "STAFF" });
@@ -100,6 +102,21 @@ export default function AdminPage() {
 
   async function deleteSlot(id: string) {
     await fetch(`/api/timeslots/${id}`, { method: "DELETE" });
+    loadData();
+  }
+
+  async function saveEditSlot(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingSlot) return;
+    setSavingSlot(true);
+    await fetch(`/api/timeslots/${editingSlot.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label: editingSlot.label, startTime: editingSlot.startTime, orderType: editingSlot.orderType }),
+    });
+    setSavingSlot(false);
+    setEditingSlot(null);
+    showMsg("แก้ไขรอบเวลาเรียบร้อย");
     loadData();
   }
 
@@ -245,17 +262,68 @@ export default function AdminPage() {
               <p className="text-center text-gray-400 py-8">ยังไม่มีรอบเวลา</p>
             ) : (
               slots.map((s) => (
-                <div key={s.id} className="flex items-center px-4 py-3">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{s.label} — {s.startTime}</p>
-                    <p className="text-xs text-gray-400">{s.orderType === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}</p>
-                  </div>
-                  <button
-                    onClick={() => deleteSlot(s.id)}
-                    className="text-sm text-red-400 px-3 py-1.5"
-                  >
-                    ลบ
-                  </button>
+                <div key={s.id}>
+                  {editingSlot?.id === s.id ? (
+                    <form onSubmit={saveEditSlot} className="px-4 py-3 space-y-2 bg-orange-50">
+                      <input
+                        type="text"
+                        value={editingSlot.label}
+                        onChange={(e) => setEditingSlot({ ...editingSlot, label: e.target.value })}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        required
+                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={editingSlot.startTime}
+                          onChange={(e) => setEditingSlot({ ...editingSlot, startTime: e.target.value })}
+                          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          required
+                        >
+                          {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <div className="flex gap-1">
+                          {[{ v: "WALKIN", l: "🟠" }, { v: "RESERVE", l: "🔵" }].map((o) => (
+                            <button key={o.v} type="button"
+                              onClick={() => setEditingSlot({ ...editingSlot, orderType: o.v })}
+                              className={`px-3 py-2 rounded-xl text-sm font-semibold ${editingSlot.orderType === o.v ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600"}`}>
+                              {o.l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" disabled={savingSlot}
+                          className="flex-1 bg-orange-500 text-white rounded-xl py-2 text-sm font-semibold">
+                          {savingSlot ? "..." : "บันทึก"}
+                        </button>
+                        <button type="button" onClick={() => setEditingSlot(null)}
+                          className="px-4 bg-gray-100 text-gray-600 rounded-xl py-2 text-sm font-semibold">
+                          ยกเลิก
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex items-center px-4 py-3">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-800">{s.label} — {s.startTime}</p>
+                        <p className="text-xs text-gray-400">{s.orderType === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingSlot({ id: s.id, label: s.label, startTime: s.startTime, orderType: s.orderType })}
+                          className="text-sm text-orange-500 px-3 py-1.5 font-medium"
+                        >
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={() => deleteSlot(s.id)}
+                          className="text-sm text-red-400 px-3 py-1.5"
+                        >
+                          ลบ
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             )}
