@@ -34,7 +34,11 @@ export default function StockPage() {
     setLoading(false);
   }, [selectedDate]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const walkInSlots = timeSlots.filter((s) => s.orderType === "WALKIN").map((s) => s.startTime);
   const reserveSlots = timeSlots.filter((s) => s.orderType === "RESERVE").map((s) => s.startTime);

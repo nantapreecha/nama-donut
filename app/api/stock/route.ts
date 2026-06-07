@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { startOfDay } from "@/lib/dateUtils";
+import { auth } from "@/auth";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -32,7 +33,9 @@ export async function GET(req: Request) {
 
 // POST — set initial stock หรือ add (เติม) ขึ้นอยู่กับ mode
 export async function POST(req: Request) {
-  const { stockDate: dateParam, orderType, roundTime, doughType, amount, mode, note, createdBy } = await req.json();
+  const session = await auth();
+  const { stockDate: dateParam, orderType, roundTime, doughType, amount, mode, note } = await req.json();
+  const createdBy = (session?.user?.name) ?? null;
   const stockDate = dateParam ? startOfDay(new Date(dateParam)) : startOfDay(new Date());
 
   // mode "set" = ตั้งค่าเริ่มต้น (replace), mode "add" = เติมเพิ่ม

@@ -10,6 +10,7 @@ interface Order {
   pumpkinQty: number;
   mochiQty: number;
   channel: string;
+  isPaid: boolean;
   status: string;
   note: string | null;
 }
@@ -67,6 +68,15 @@ export default function DashboardPage() {
       body: JSON.stringify({ status: next }),
     });
     setToggling(null);
+    load();
+  }
+
+  async function togglePaid(orderId: string, isPaid: boolean) {
+    await fetch(`/api/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isPaid: !isPaid }),
+    });
     load();
   }
 
@@ -203,12 +213,20 @@ export default function DashboardPage() {
                             {order.orderType === "WALKIN" ? "หน้าร้าน" : "จอง"}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {order.pumpkinQty > 0 && `🟡${order.pumpkinQty} `}
-                          {order.mochiQty > 0 && `⚪${order.mochiQty} `}
-                          · {CHANNEL_LABEL[order.channel] ?? order.channel}
-                          {order.note ? ` · ${order.note}` : ""}
-                        </p>
+                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                          <span className="text-xs text-gray-400">
+                            {order.pumpkinQty > 0 && `🟡${order.pumpkinQty} `}
+                            {order.mochiQty > 0 && `⚪${order.mochiQty} `}
+                            · {CHANNEL_LABEL[order.channel] ?? order.channel}
+                            {order.note ? ` · ${order.note}` : ""}
+                          </span>
+                          <button
+                            onClick={() => togglePaid(order.id, order.isPaid)}
+                            className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${order.isPaid ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}
+                          >
+                            {order.isPaid ? "💰ชำระแล้ว" : "ยังไม่ชำระ"}
+                          </button>
+                        </div>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${
                         order.status === "COMPLETED" ? "bg-green-100 text-green-600" : "bg-yellow-100 text-yellow-700"
