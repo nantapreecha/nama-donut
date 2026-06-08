@@ -76,7 +76,7 @@ export default function StockPage() {
     setTimeout(() => setSaved((s) => ({ ...s, [k]: false })), 2000);
   }
 
-  const displayDate = date.toLocaleDateString("th-TH", {
+  const displayDate = new Date(selectedDate + "T00:00:00").toLocaleDateString("th-TH", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
