@@ -5,7 +5,11 @@ export async function GET(req: NextRequest) {
   const cookieStore = await cookies();
   const allCookies = cookieStore.getAll();
 
-  const origin = req.nextUrl.origin;
+  // ใช้ x-forwarded-host สำหรับ Railway/proxy environment
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "localhost:3000";
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const origin = `${proto}://${host}`;
+
   const res = NextResponse.redirect(new URL("/login", origin));
 
   for (const c of allCookies) {
