@@ -6,6 +6,11 @@ interface Props {
 }
 
 export default function TopBar({ name, role }: Props) {
+  function handleLogout() {
+    document.cookie = "nama-session=; max-age=0; path=/";
+    window.location.href = "/login";
+  }
+
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 h-14 flex items-center px-4">
       <div className="flex items-center gap-2">
@@ -17,12 +22,12 @@ export default function TopBar({ name, role }: Props) {
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${role === "ADMIN" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"}`}>
           {role === "ADMIN" ? "Admin" : "Staff"}
         </span>
-        <a
-          href="/api/logout"
+        <button
+          onClick={handleLogout}
           className="text-sm text-white bg-red-400 hover:bg-red-500 transition-colors px-3 py-1 rounded-lg font-medium"
         >
           ออกจากระบบ
-        </a>
+        </button>
       </div>
     </header>
   );
