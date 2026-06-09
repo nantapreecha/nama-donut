@@ -20,7 +20,7 @@ export default function TopBar({ name, role }: Props) {
           {role === "ADMIN" ? "Admin" : "Staff"}
         </span>
         <button
-          onClick={() => { window.location.href = "/api/logout"; }}
+          onClick={() => signOut({ callbackUrl: "/login" })}
           className="text-sm text-white bg-red-400 hover:bg-red-500 transition-colors px-3 py-1 rounded-lg font-medium"
         >
           ออกจากระบบ
