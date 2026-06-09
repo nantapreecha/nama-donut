@@ -1,9 +1,12 @@
 "use server";
 
-import { signOut } from "@/auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export async function logout() {
-  await signOut({ redirect: false });
+  const cookieStore = await cookies();
+  for (const c of cookieStore.getAll()) {
+    cookieStore.delete(c.name);
+  }
   redirect("/login");
 }
