@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: [
       ["Content-Type", "text/html"],
+      ["Cache-Control", "no-store"],
       ...deletedHeaders.map((h) => ["Set-Cookie", h] as [string, string]),
     ],
   });

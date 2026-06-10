@@ -7,8 +7,9 @@ interface Props {
 
 export default function TopBar({ name, role }: Props) {
   function handleLogout() {
+    // ลบ cookie ฝั่ง client ก่อน แล้วให้ /api/logout ลบที่เหลือ (รวม cookie เก่า) ฝั่ง server
     document.cookie = "nama-session=; max-age=0; path=/";
-    window.location.href = "/login";
+    window.location.href = "/api/logout";
   }
 
   return (
