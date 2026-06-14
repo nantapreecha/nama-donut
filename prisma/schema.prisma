@@ -127,6 +127,8 @@ model Order {
   mochiQty   Int          @default(0)
   isPaid     Boolean      @default(false)
   status     OrderStatus  @default(PENDING)
+  cancelledAt DateTime?
+  cancelledBy String?
   note       String?
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt

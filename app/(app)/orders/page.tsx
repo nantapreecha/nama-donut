@@ -13,6 +13,8 @@ interface Order {
   pickupDate: string;
   isPaid: boolean;
   status: string;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
   note: string | null;
 }
 interface TimeSlot { id: string; label: string; startTime: string; orderType: string; }
@@ -40,6 +42,8 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Form state
   const [orderType, setOrderType] = useState<TypeTab>("WALKIN");
@@ -130,6 +134,19 @@ export default function OrdersPage() {
     loadOrders();
   }
 
+  async function confirmCancel() {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    await fetch(`/api/orders/${cancelTarget.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "CANCELLED" }),
+    });
+    setCancelling(false);
+    setCancelTarget(null);
+    loadOrders();
+  }
+
   async function togglePaid(orderId: string, isPaid: boolean) {
     await fetch(`/api/orders/${orderId}`, {
       method: "PATCH",
@@ -199,10 +216,16 @@ export default function OrdersPage() {
                     {order.mochiQty > 0 && <span>⚪ โมจิ {order.mochiQty} ชิ้น</span>}
                   </div>
                   {order.note && <p className="text-xs text-gray-400">{order.note}</p>}
+                  {order.status === "CANCELLED" && order.cancelledAt && (
+                    <p className="text-xs text-red-400 bg-red-50 rounded-lg px-2 py-1">
+                      ❌ ยกเลิกเมื่อ {new Date(order.cancelledAt).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {order.cancelledBy ? ` · โดย ${order.cancelledBy}` : ""}
+                    </p>
+                  )}
                   {order.status === "PENDING" && (
                     <div className="flex gap-2 pt-1">
                       <button onClick={() => updateStatus(order.id, "COMPLETED")} className="flex-1 bg-green-500 text-white rounded-xl py-2 text-sm font-semibold">รับแล้ว ✓</button>
-                      <button onClick={() => updateStatus(order.id, "CANCELLED")} className="px-4 bg-gray-100 text-gray-600 rounded-xl py-2 text-sm font-semibold">ยกเลิก</button>
+                      <button onClick={() => setCancelTarget(order)} className="px-4 bg-red-50 text-red-500 rounded-xl py-2 text-sm font-semibold">ยกเลิก</button>
                     </div>
                   )}
                 </div>
@@ -315,6 +338,34 @@ export default function OrdersPage() {
             {submitting ? "กำลังบันทึก..." : "บันทึกออเดอร์"}
           </button>
         </form>
+      )}
+
+      {/* Popup ยืนยันยกเลิกออเดอร์ */}
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => !cancelling && setCancelTarget(null)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-xs space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center">
+              <p className="text-4xl mb-2">⚠️</p>
+              <h3 className="font-bold text-gray-800 text-lg">ยกเลิกออเดอร์?</h3>
+              <p className="text-sm text-gray-500 mt-1">{cancelTarget.customer.name}</p>
+            </div>
+            <div className="bg-orange-50 rounded-xl p-3 text-sm text-gray-700 space-y-1">
+              <p className="text-xs text-gray-500">สินค้าจะถูกคืนเข้ารอบ {cancelTarget.roundTime}:</p>
+              {cancelTarget.pumpkinQty > 0 && <p>🟡 ฟักทอง {cancelTarget.pumpkinQty} ชิ้น</p>}
+              {cancelTarget.mochiQty > 0 && <p>⚪ โมจิ {cancelTarget.mochiQty} ชิ้น</p>}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setCancelTarget(null)} disabled={cancelling}
+                className="flex-1 bg-gray-100 text-gray-600 rounded-xl py-3 text-sm font-semibold">
+                ไม่ยกเลิก
+              </button>
+              <button onClick={confirmCancel} disabled={cancelling}
+                className="flex-1 bg-red-500 text-white rounded-xl py-3 text-sm font-semibold">
+                {cancelling ? "..." : "ยืนยันยกเลิก"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
