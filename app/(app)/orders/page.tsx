@@ -17,7 +17,7 @@ interface Order {
   cancelledBy: string | null;
   note: string | null;
 }
-interface TimeSlot { id: string; label: string; startTime: string; orderType: string; }
+interface TimeSlot { id: string; label: string; startTime: string; }
 
 const CHANNELS = [
   { value: "FACEBOOK", label: "Facebook" },
@@ -45,8 +45,8 @@ export default function OrdersPage() {
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
-  // Form state
-  const [orderType, setOrderType] = useState<TypeTab>("WALKIN");
+  // Form state — ค่าเริ่มต้นเป็นออเดอร์จอง toggle เปิด = ออเดอร์หน้าร้าน
+  const [orderType, setOrderType] = useState<TypeTab>("RESERVE");
   const [pickupDate, setPickupDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -76,11 +76,21 @@ export default function OrdersPage() {
     return () => clearInterval(interval);
   }, [loadOrders]);
 
-  // รอบเวลาจาก DB ตาม orderType
-  const availableSlots = timeSlots.filter((s) => s.orderType === orderType);
+  // รอบเวลาจาก DB — สต๊อกกองเดียวกัน ใช้รายการเดียวกันทั้งจองและหน้าร้าน
+  const availableSlots = timeSlots;
+  const isWalkIn = orderType === "WALKIN";
 
-  // Reset roundTime เมื่อเปลี่ยน orderType หรือ pickupDate
-  useEffect(() => { setRoundTime(""); }, [orderType, pickupDate]);
+  // Reset roundTime เมื่อเปลี่ยนวันที่รับ
+  useEffect(() => { setRoundTime(""); }, [pickupDate]);
+
+  // toggle ออเดอร์หน้าร้าน: ปรับช่องทางให้อัตโนมัติ
+  function toggleWalkIn() {
+    setOrderType((t) => {
+      const next = t === "WALKIN" ? "RESERVE" : "WALKIN";
+      setChannel(next === "WALKIN" ? "WALK_IN" : "FACEBOOK");
+      return next;
+    });
+  }
 
   async function lookupPhone() {
     if (phone.length < 9) return;
@@ -240,17 +250,18 @@ export default function OrdersPage() {
           {formError && <div className="bg-red-50 text-red-600 rounded-xl px-4 py-3 text-sm">{formError}</div>}
           {formSuccess && <div className="bg-green-50 text-green-600 rounded-xl px-4 py-3 text-sm font-medium">{formSuccess}</div>}
 
-          {/* ประเภทออเดอร์ */}
-          <div className="bg-white rounded-2xl p-4 space-y-2">
-            <h3 className="font-semibold text-gray-700">ประเภทออเดอร์</h3>
-            <div className="flex gap-2">
-              {(["WALKIN", "RESERVE"] as TypeTab[]).map((t) => (
-                <button key={t} type="button" onClick={() => setOrderType(t)}
-                  className={`flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-colors ${orderType === t ? (t === "WALKIN" ? "border-orange-400 bg-orange-50 text-orange-700" : "border-blue-400 bg-blue-50 text-blue-700") : "border-gray-100 bg-gray-50 text-gray-500"}`}>
-                  {t === "WALKIN" ? "🟠 หน้าร้าน" : "🔵 จอง"}
-                </button>
-              ))}
+          {/* Toggle ออเดอร์หน้าร้าน */}
+          <div className={`rounded-2xl p-4 flex items-center justify-between transition-colors ${isWalkIn ? "bg-orange-50 border border-orange-200" : "bg-white"}`}>
+            <div>
+              <h3 className="font-semibold text-gray-700">🟠 ออเดอร์หน้าร้าน</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {isWalkIn ? "ตัดสต๊อกจากรอบผลิตที่เลือกทันที" : "ปิดอยู่ = ออเดอร์จอง 🔵 (เลือกเวลานัดรับ)"}
+              </p>
             </div>
+            <button type="button" onClick={toggleWalkIn} aria-label="สลับออเดอร์หน้าร้าน"
+              className={`relative w-[52px] h-8 rounded-full transition-colors flex-shrink-0 ${isWalkIn ? "bg-orange-500" : "bg-gray-200"}`}>
+              <span className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-all ${isWalkIn ? "left-[24px]" : "left-1"}`} />
+            </button>
           </div>
 
           {/* ข้อมูลลูกค้า */}
@@ -272,16 +283,18 @@ export default function OrdersPage() {
             </div>
           </div>
 
-          {/* วันที่รับ + รอบเวลา */}
+          {/* วันที่รับ + รอบเวลา/รอบผลิต */}
           <div className="bg-white rounded-2xl p-4 space-y-3">
-            <h3 className="font-semibold text-gray-700">วันที่รับ & รอบเวลา</h3>
+            <h3 className="font-semibold text-gray-700">{isWalkIn ? "วันที่ & รอบผลิต" : "วันที่รับ & รอบเวลา"}</h3>
             <div>
-              <label className="text-sm text-gray-600 mb-1 block">วันที่รับ</label>
+              <label className="text-sm text-gray-600 mb-1 block">{isWalkIn ? "วันที่ขาย" : "วันที่รับ"}</label>
               <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400" />
             </div>
             <div>
-              <label className="text-sm text-gray-600 mb-1 block">รอบเวลา *</label>
+              <label className="text-sm text-gray-600 mb-1 block">
+                {isWalkIn ? "รอบผลิตที่ตัดสต๊อก *" : "รอบเวลานัดรับ *"}
+              </label>
               {availableSlots.length === 0 ? (
                 <p className="text-sm text-gray-400">ยังไม่มีรอบเวลา — ให้ Admin เพิ่มที่หน้าตั้งค่า</p>
               ) : (

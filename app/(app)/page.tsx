@@ -16,7 +16,6 @@ interface Order {
 }
 
 interface SlotSummary {
-  orderType: string;
   roundTime: string;
   pumpkin: { qty: number; sold: number };
   mochi: { qty: number; sold: number };
@@ -130,11 +129,10 @@ export default function DashboardPage() {
       ) : (
         allRoundTimes.map((roundTime) => {
           const ordersInSlot = (data?.orders ?? []).filter((o) => o.roundTime === roundTime);
-          const walkInStock = data?.stockSummary.find((s) => s.roundTime === roundTime && s.orderType === "WALKIN");
-          const reserveStock = data?.stockSummary.find((s) => s.roundTime === roundTime && s.orderType === "RESERVE");
+          const slotStock = data?.stockSummary.find((s) => s.roundTime === roundTime);
           const walkInOrders = ordersInSlot.filter((o) => o.orderType === "WALKIN");
           const reserveOrders = ordersInSlot.filter((o) => o.orderType === "RESERVE");
-          const hasContent = walkInStock || reserveStock || ordersInSlot.length > 0;
+          const hasContent = slotStock || ordersInSlot.length > 0;
           if (!hasContent) return null;
 
           return (
@@ -142,51 +140,17 @@ export default function DashboardPage() {
               {/* Slot header */}
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                 <p className="font-bold text-gray-800 text-base">🕐 {roundTime}</p>
-                <div className="flex gap-3 text-xs">
-                  {walkInStock && (
-                    <span className="text-orange-600">
-                      🟠 ฟ.{Math.max(0, walkInStock.pumpkin.qty - walkInStock.pumpkin.sold)} / ม.{Math.max(0, walkInStock.mochi.qty - walkInStock.mochi.sold)}
+                {slotStock && (
+                  <div className="flex gap-2 text-xs">
+                    <span className={`font-semibold ${availableColor(slotStock.pumpkin.qty - slotStock.pumpkin.sold, slotStock.pumpkin.qty)}`}>
+                      🟡 เหลือ {Math.max(0, slotStock.pumpkin.qty - slotStock.pumpkin.sold)} ชิ้น
                     </span>
-                  )}
-                  {reserveStock && (
-                    <span className="text-blue-600">
-                      🔵 ฟ.{Math.max(0, reserveStock.pumpkin.qty - reserveStock.pumpkin.sold)} / ม.{Math.max(0, reserveStock.mochi.qty - reserveStock.mochi.sold)}
+                    <span className={`font-semibold ${availableColor(slotStock.mochi.qty - slotStock.mochi.sold, slotStock.mochi.qty)}`}>
+                      ⚪ เหลือ {Math.max(0, slotStock.mochi.qty - slotStock.mochi.sold)} ชิ้น
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-
-              {/* Stock remaining detail */}
-              {(walkInStock || reserveStock) && (
-                <div className="px-4 py-2 border-b border-gray-50 flex gap-4">
-                  {walkInStock && (
-                    <div className="flex-1 bg-orange-50 rounded-xl p-2">
-                      <p className="text-xs text-orange-600 font-medium mb-1">🟠 หน้าร้าน</p>
-                      <div className="flex gap-2 text-xs">
-                        <span className={`font-semibold ${availableColor(walkInStock.pumpkin.qty - walkInStock.pumpkin.sold, walkInStock.pumpkin.qty)}`}>
-                          🟡 เหลือ {Math.max(0, walkInStock.pumpkin.qty - walkInStock.pumpkin.sold)} ชิ้น
-                        </span>
-                        <span className={`font-semibold ${availableColor(walkInStock.mochi.qty - walkInStock.mochi.sold, walkInStock.mochi.qty)}`}>
-                          ⚪ เหลือ {Math.max(0, walkInStock.mochi.qty - walkInStock.mochi.sold)} ชิ้น
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {reserveStock && (
-                    <div className="flex-1 bg-blue-50 rounded-xl p-2">
-                      <p className="text-xs text-blue-600 font-medium mb-1">🔵 จอง</p>
-                      <div className="flex gap-2 text-xs">
-                        <span className={`font-semibold ${availableColor(reserveStock.pumpkin.qty - reserveStock.pumpkin.sold, reserveStock.pumpkin.qty)}`}>
-                          🟡 เหลือ {Math.max(0, reserveStock.pumpkin.qty - reserveStock.pumpkin.sold)} ชิ้น
-                        </span>
-                        <span className={`font-semibold ${availableColor(reserveStock.mochi.qty - reserveStock.mochi.sold, reserveStock.mochi.qty)}`}>
-                          ⚪ เหลือ {Math.max(0, reserveStock.mochi.qty - reserveStock.mochi.sold)} ชิ้น
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Orders in this slot */}
               {ordersInSlot.length > 0 && (

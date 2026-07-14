@@ -13,13 +13,12 @@ export async function GET(req: Request) {
     include: {
       history: { orderBy: { createdAt: "desc" }, take: 20 },
     },
-    orderBy: [{ orderType: "asc" }, { roundTime: "asc" }, { doughType: "asc" }],
+    orderBy: [{ roundTime: "asc" }, { doughType: "asc" }],
   });
 
   const result = batches.map((b) => ({
     id: b.id,
     stockDate: b.stockDate,
-    orderType: b.orderType,
     roundTime: b.roundTime,
     doughType: b.doughType,
     qty: b.qty,
@@ -34,7 +33,7 @@ export async function GET(req: Request) {
 // POST — set initial stock หรือ add (เติม) ขึ้นอยู่กับ mode
 export async function POST(req: Request) {
   const session = await auth();
-  const { stockDate: dateParam, orderType, roundTime, doughType, amount, mode, note } = await req.json();
+  const { stockDate: dateParam, roundTime, doughType, amount, mode, note } = await req.json();
   const createdBy = (session?.user?.name) ?? null;
   const stockDate = dateParam ? startOfDay(new Date(dateParam)) : startOfDay(new Date());
 
@@ -42,15 +41,15 @@ export async function POST(req: Request) {
   const isAdd = mode === "add";
 
   const existing = await prisma.stockBatch.findUnique({
-    where: { stockDate_orderType_roundTime_doughType: { stockDate, orderType, roundTime, doughType } },
+    where: { stockDate_roundTime_doughType: { stockDate, roundTime, doughType } },
   });
 
   const newQty = isAdd ? (existing?.qty ?? 0) + amount : amount;
 
   const batch = await prisma.stockBatch.upsert({
-    where: { stockDate_orderType_roundTime_doughType: { stockDate, orderType, roundTime, doughType } },
+    where: { stockDate_roundTime_doughType: { stockDate, roundTime, doughType } },
     update: { qty: newQty },
-    create: { stockDate, orderType, roundTime, doughType, qty: newQty },
+    create: { stockDate, roundTime, doughType, qty: newQty },
     include: { history: { orderBy: { createdAt: "desc" }, take: 20 } },
   });
 

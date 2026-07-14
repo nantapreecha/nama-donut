@@ -71,7 +71,6 @@ model DailyStock {
 model StockBatch {
   id        String         @id @default(cuid())
   stockDate DateTime       @db.Date
-  orderType OrderType
   roundTime String
   doughType DoughType
   qty       Int            @default(0)
@@ -80,7 +79,7 @@ model StockBatch {
   updatedAt DateTime       @updatedAt
   history   StockHistory[]
 
-  @@unique([stockDate, orderType, roundTime, doughType])
+  @@unique([stockDate, roundTime, doughType])
 }
 
 model StockHistory {
@@ -108,7 +107,6 @@ model TimeSlot {
   endTime    String
   maxOrders  Int       @default(0)
   isActive   Boolean   @default(true)
-  orderType  OrderType @default(WALKIN)
   orders     Order[]
 }
 

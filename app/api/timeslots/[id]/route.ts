@@ -19,6 +19,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { id } = await params;
-  await prisma.timeSlot.update({ where: { id }, data: { isActive: false } });
+  // ลบถาวร — ปลดออเดอร์เก่าที่อ้างรอบนี้ก่อน (ออเดอร์ยังอยู่ครบ เพราะเก็บ roundTime ในตัวเอง)
+  await prisma.$transaction([
+    prisma.order.updateMany({ where: { timeSlotId: id }, data: { timeSlotId: null } }),
+    prisma.timeSlot.delete({ where: { id } }),
+  ]);
   return NextResponse.json({ ok: true });
 }

@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   // Check stock for pumpkin
   if (pumpkinQty > 0) {
     const batch = await prisma.stockBatch.findUnique({
-      where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "PUMPKIN" } },
+      where: { stockDate_roundTime_doughType: { stockDate: pickup, roundTime, doughType: "PUMPKIN" } },
     });
     const available = Math.max(0, (batch?.qty ?? 0) - (batch?.sold ?? 0));
     if (available < pumpkinQty) {
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   // Check stock for mochi
   if (mochiQty > 0) {
     const batch = await prisma.stockBatch.findUnique({
-      where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "MOCHI" } },
+      where: { stockDate_roundTime_doughType: { stockDate: pickup, roundTime, doughType: "MOCHI" } },
     });
     const available = Math.max(0, (batch?.qty ?? 0) - (batch?.sold ?? 0));
     if (available < mochiQty) {
@@ -67,19 +67,19 @@ export async function POST(req: Request) {
       include: { customer: true },
     });
 
-    // Deduct stock from StockBatch
+    // Deduct stock from StockBatch (กองเดียวกันทั้งจองและหน้าร้าน)
     if (pumpkinQty > 0) {
       await tx.stockBatch.upsert({
-        where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "PUMPKIN" } },
+        where: { stockDate_roundTime_doughType: { stockDate: pickup, roundTime, doughType: "PUMPKIN" } },
         update: { sold: { increment: pumpkinQty } },
-        create: { stockDate: pickup, orderType, roundTime, doughType: "PUMPKIN", qty: 0, sold: pumpkinQty },
+        create: { stockDate: pickup, roundTime, doughType: "PUMPKIN", qty: 0, sold: pumpkinQty },
       });
     }
     if (mochiQty > 0) {
       await tx.stockBatch.upsert({
-        where: { stockDate_orderType_roundTime_doughType: { stockDate: pickup, orderType, roundTime, doughType: "MOCHI" } },
+        where: { stockDate_roundTime_doughType: { stockDate: pickup, roundTime, doughType: "MOCHI" } },
         update: { sold: { increment: mochiQty } },
-        create: { stockDate: pickup, orderType, roundTime, doughType: "MOCHI", qty: 0, sold: mochiQty },
+        create: { stockDate: pickup, roundTime, doughType: "MOCHI", qty: 0, sold: mochiQty },
       });
     }
 

@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const [batches, orders] = await Promise.all([
     prisma.stockBatch.findMany({
       where: { stockDate: date },
-      orderBy: [{ orderType: "asc" }, { roundTime: "asc" }, { doughType: "asc" }],
+      orderBy: [{ roundTime: "asc" }, { doughType: "asc" }],
     }),
     prisma.order.findMany({
       where: { pickupDate: { gte: date, lt: nextDay }, status: { not: "CANCELLED" } },
@@ -24,17 +24,15 @@ export async function GET(req: Request) {
   const totalSold = batches.reduce((s, b) => s + b.sold, 0);
   const pendingOrdersCount = orders.filter((o) => o.status === "PENDING").length;
 
-  // Group stock by orderType + roundTime
-  type SlotKey = string;
-  const slotMap = new Map<SlotKey, {
-    orderType: string; roundTime: string;
+  // Group stock by roundTime (สต๊อกกองเดียวต่อรอบ)
+  const slotMap = new Map<string, {
+    roundTime: string;
     pumpkin: { qty: number; sold: number };
     mochi: { qty: number; sold: number };
   }>();
   for (const b of batches) {
-    const key = `${b.orderType}|${b.roundTime}`;
-    if (!slotMap.has(key)) slotMap.set(key, { orderType: b.orderType, roundTime: b.roundTime, pumpkin: { qty: 0, sold: 0 }, mochi: { qty: 0, sold: 0 } });
-    const slot = slotMap.get(key)!;
+    if (!slotMap.has(b.roundTime)) slotMap.set(b.roundTime, { roundTime: b.roundTime, pumpkin: { qty: 0, sold: 0 }, mochi: { qty: 0, sold: 0 } });
+    const slot = slotMap.get(b.roundTime)!;
     if (b.doughType === "PUMPKIN") slot.pumpkin = { qty: b.qty, sold: b.sold };
     if (b.doughType === "MOCHI") slot.mochi = { qty: b.qty, sold: b.sold };
   }

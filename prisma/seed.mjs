@@ -30,25 +30,15 @@ async function main() {
     });
   }
 
-  // Time slots (หน้าร้าน)
-  const walkInSlots = [
-    { label: "รอบ 1", startTime: "09:30", endTime: "10:30", maxOrders: 30, orderType: "WALKIN" },
-    { label: "รอบ 2", startTime: "11:30", endTime: "12:30", maxOrders: 30, orderType: "WALKIN" },
-    { label: "รอบ 3", startTime: "13:30", endTime: "14:30", maxOrders: 30, orderType: "WALKIN" },
-  ];
-
-  // Time slots (จอง)
-  const reserveSlots = [
-    { label: "รอบ 1", startTime: "10:30", endTime: "11:30", maxOrders: 30, orderType: "RESERVE" },
-    { label: "รอบ 2", startTime: "12:30", endTime: "13:30", maxOrders: 30, orderType: "RESERVE" },
-    { label: "รอบ 3", startTime: "14:30", endTime: "15:30", maxOrders: 30, orderType: "RESERVE" },
-  ];
-
-  for (const slot of [...walkInSlots, ...reserveSlots]) {
-    const existing = await prisma.timeSlot.findFirst({
-      where: { startTime: slot.startTime, orderType: slot.orderType },
-    });
-    if (!existing) {
+  // Time slots — seed เฉพาะตอนตารางว่างเท่านั้น (ไม่งั้นรอบที่แอดมินลบถาวรจะเด้งกลับมาทุก deploy)
+  const slotCount = await prisma.timeSlot.count();
+  if (slotCount === 0) {
+    const defaultSlots = [
+      { label: "รอบ 1", startTime: "09:30", endTime: "", maxOrders: 30 },
+      { label: "รอบ 2", startTime: "11:30", endTime: "", maxOrders: 30 },
+      { label: "รอบ 3", startTime: "13:30", endTime: "", maxOrders: 30 },
+    ];
+    for (const slot of defaultSlots) {
       await prisma.timeSlot.create({ data: slot });
     }
   }

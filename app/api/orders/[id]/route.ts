@@ -28,13 +28,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (order.roundTime) {
         if (order.pumpkinQty > 0) {
           await tx.stockBatch.updateMany({
-            where: { stockDate: pickup, orderType: order.orderType, roundTime: order.roundTime, doughType: "PUMPKIN" },
+            where: { stockDate: pickup, roundTime: order.roundTime, doughType: "PUMPKIN" },
             data: { sold: { decrement: order.pumpkinQty } },
           });
         }
         if (order.mochiQty > 0) {
           await tx.stockBatch.updateMany({
-            where: { stockDate: pickup, orderType: order.orderType, roundTime: order.roundTime, doughType: "MOCHI" },
+            where: { stockDate: pickup, roundTime: order.roundTime, doughType: "MOCHI" },
             data: { sold: { decrement: order.mochiQty } },
           });
         }

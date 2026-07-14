@@ -10,7 +10,28 @@
       "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); node --version; npm --version)",
       "PowerShell(pandoc \"C:\\\\Users\\\\Nanta\\\\Downloads\\\\Requirement_ระบบตัดสต๊อกโดนัท_Final.docx\" -o \"$env:TEMP\\\\req.md\" --to markdown; Get-Content \"$env:TEMP\\\\req.md\" -Encoding utf8)",
       "PowerShell(pandoc \"C:\\\\Users\\\\Nanta\\\\Downloads\\\\Requirement_?????????????????_Final.docx\" -t markdown 2>&1)",
-      "PowerShell(cd \"C:\\\\Users\\\\Nanta\\\\OneDrive\\\\Documents\\\\Cowork\\\\Nama\"; git add app/api/products/[id]/route.ts app/\\(app\\)/admin/page.tsx; git commit -m \"feat: add delete product in admin page\"; git push)"
+      "PowerShell(cd \"C:\\\\Users\\\\Nanta\\\\OneDrive\\\\Documents\\\\Cowork\\\\Nama\"; git add app/api/products/[id]/route.ts app/\\(app\\)/admin/page.tsx; git commit -m \"feat: add delete product in admin page\"; git push)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(curl.exe -s -i -o - --max-time 30 \"https://nama-donut-production.up.railway.app/api/logout\")",
+      "Bash(curl.exe -s -i --max-time 30 \"https://nama-donut-production.up.railway.app/api/auth/session\")",
+      "Bash(curl.exe -s --max-time 30 \"https://nama-donut-production.up.railway.app/api/auth/providers\")",
+      "Bash(curl.exe -s -i --max-time 30 -H \"Cookie: __Secure-authjs.session-token=FAKETOKEN123; authjs.csrf-token=abc\" \"https://nama-donut-production.up.railway.app/api/logout\")",
+      "Bash(npm run *)",
+      "Bash(curl.exe -s -i --max-time 15 \"https://nama-donut-production.up.railway.app/api/logout\")",
+      "Bash(node node_modules/prisma/build/index.js generate)",
+      "Bash(bash \"C:\\\\Users\\\\Nanta\\\\AppData\\\\Local\\\\Temp\\\\nama_cancel_test.sh\")",
+      "Bash(python -c \"import PIL; print\\('Pillow', PIL.__version__\\)\")",
+      "Bash(find \"/c/Users/Nanta/Downloads\" \"/c/Users/Nanta/OneDrive/Desktop\" \"/c/Users/Nanta/Desktop\" \"/c/Users/Nanta/OneDrive/Documents/Cowork/Nama\" -maxdepth 2 -type f \\\\\\( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \\\\\\) -newermt \"-3 days\" 2>/dev/null | head -50)",
+      "Bash(magick --version)",
+      "Bash(convert --version)",
+      "Bash(ffmpeg -version)",
+      "Bash(node -e ' *)",
+      "Bash(node tmp_grid.js)",
+      "Bash(node tmp_export.js)",
+      "Bash(cd \"/c/Users/Nanta/OneDrive/Documents/Cowork/Nama\" && rm -f tmp_grid.js tmp_export.js \"/c/Users/Nanta/Downloads/_grid_overlay.png\" \"/c/Users/Nanta/Downloads/_ov_top.png\" \"/c/Users/Nanta/Downloads/_ov_bot.png\" && echo \"cleaned\" && echo \"--- final output ---\" && ls -1 \"/c/Users/Nanta/Downloads/highlight-covers\" | wc -l && du -sh \"/c/Users/Nanta/Downloads/highlight-covers\")",
+      "Bash(git commit -m 'feat: unified stock pool per round + iPhone-alarm-style timeslot settings *)"
     ]
   }
 }
