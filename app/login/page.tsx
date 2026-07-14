@@ -11,18 +11,27 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // อ่านค่าจากฟอร์มจริงเป็นหลัก — กัน iOS autofill ที่เติมค่าแล้วไม่ trigger onChange (state ว่าง)
+    const fd = new FormData(e.currentTarget);
+    const u = ((fd.get("username") as string) || username).trim();
+    const p = (fd.get("password") as string) || password;
     setLoading(true);
     setError("");
     const result = await signIn("credentials", {
-      username,
-      password,
+      username: u,
+      password: p,
       redirect: false,
     });
     setLoading(false);
     if (result?.error) {
-      setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+      // แยก "รหัสผิดจริง" ออกจากปัญหาระบบ — จะได้ไม่โทษรหัสผ่านมั่ว
+      setError(
+        result.error === "CredentialsSignin"
+          ? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+          : `ระบบขัดข้องชั่วคราว (${result.error}) — ลองใหม่อีกครั้ง`
+      );
     } else {
       router.push("/");
       router.refresh();
@@ -51,11 +60,15 @@ export default function LoginPage() {
             </label>
             <input
               type="text"
+              name="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"
               placeholder="username"
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               required
             />
           </div>
@@ -66,6 +79,7 @@ export default function LoginPage() {
             </label>
             <input
               type="password"
+              name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-400"

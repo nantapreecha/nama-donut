@@ -26,8 +26,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
+        // trim กันช่องว่างติดมากับ autofill/คีย์บอร์ดมือถือ
         const user = await prisma.user.findUnique({
-          where: { username: credentials.username as string },
+          where: { username: (credentials.username as string).trim() },
         });
         if (!user) return null;
         const valid = await bcrypt.compare(
