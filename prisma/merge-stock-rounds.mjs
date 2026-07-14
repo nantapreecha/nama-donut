@@ -1,18 +1,22 @@
-// One-time migration: รวม StockBatch ที่เคยแยกกอง (WALKIN/RESERVE) ให้เหลือกองเดียวต่อ (วัน, รอบ, แป้ง)
-// ต้องรันก่อน `prisma db push` เพราะ unique ใหม่ (stockDate, roundTime, doughType) จะชนกับข้อมูลเก่า
-// ใช้ raw SQL ล้วน — ทำงานได้ไม่ว่า Prisma client จะ generate จาก schema เก่าหรือใหม่ และ idempotent
+// Migration: รวม StockBatch ที่ซ้ำกันบน (stockDate, roundTime, doughType) ให้เหลือแถวเดียว
+// ต้องรันก่อน `prisma db push` เพราะ unique ใหม่จะสร้างไม่ได้ถ้ามีแถวซ้ำ
+// ใช้ raw SQL ล้วน — ทำงานได้ทั้ง schema เก่า/ใหม่ และ idempotent โดยธรรมชาติ
+// (รันซ้ำ = ไม่มีแถวซ้ำแล้ว = no-op) ไม่เช็คคอลัมน์ orderType เพราะ migration อาจค้างครึ่งทาง
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 try {
-  // ถ้าคอลัมน์ orderType ไม่มีแล้ว = migrate ไปแล้ว (หรือ DB ใหม่) ข้ามได้เลย
-  const col = await prisma.$queryRawUnsafe(
-    `SELECT 1 FROM information_schema.columns WHERE table_name = 'StockBatch' AND column_name = 'orderType'`
-  );
-  if (!Array.isArray(col) || col.length === 0) {
-    console.log("merge-stock-rounds: nothing to do (already migrated or fresh DB)");
+  const dups = await prisma.$queryRawUnsafe(`
+    SELECT "stockDate", "roundTime", "doughType", COUNT(*)::int AS n
+    FROM "StockBatch"
+    GROUP BY "stockDate", "roundTime", "doughType"
+    HAVING COUNT(*) > 1
+  `);
+  if (!Array.isArray(dups) || dups.length === 0) {
+    console.log("merge-stock-rounds: no duplicate batches — nothing to do");
   } else {
+    console.log(`merge-stock-rounds: found ${dups.length} duplicated group(s), merging...`);
     // 1) ย้าย StockHistory ของแถวซ้ำ ไปชี้แถวหลัก (id ต่ำสุดของกลุ่ม)
     await prisma.$executeRawUnsafe(`
       UPDATE "StockHistory" h SET "stockBatchId" = k.keep
