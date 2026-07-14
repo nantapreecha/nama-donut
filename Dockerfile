@@ -8,6 +8,8 @@ RUN npm ci
 
 FROM base AS builder
 WORKDIR /app
+# openssl จำเป็นตอน prisma generate เพื่อ detect binary target ให้ถูก (linux-musl-openssl-3.0.x)
+RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
